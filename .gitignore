@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+dist/
+local_work/
+*.npy
+*.pth
+*.pt
+*.db
+*.zip
