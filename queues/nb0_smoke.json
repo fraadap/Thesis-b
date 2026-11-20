@@ -1,0 +1,194 @@
+[
+ {
+  "kind": "train",
+  "config": "const_majority",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 0,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "max_subjects": 3,
+   "hparams": {
+    "epochs": 1,
+    "patience": 0
+   }
+  },
+  "depends_on": [],
+  "est_min": 0.0,
+  "job_id": "const_majority__split_fm__f0__s0__emo9__base"
+ },
+ {
+  "kind": "train",
+  "config": "de_asym_lr",
+  "protocol": "split_fm_lco",
+  "fold": 0,
+  "seed": 0,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "max_subjects": 3
+  },
+  "depends_on": [],
+  "est_min": 0.0,
+  "job_id": "de_asym_lr__split_fm_lco__f0__s0__emo9__base"
+ },
+ {
+  "kind": "train",
+  "config": "logpower5_lr",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 0,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "max_subjects": 3
+  },
+  "depends_on": [],
+  "est_min": 0.0,
+  "job_id": "logpower5_lr__split_fm__f0__s0__emo9__base"
+ },
+ {
+  "kind": "train",
+  "config": "eegnet_ea",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 0,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "max_subjects": 3,
+   "hparams": {
+    "epochs": 1,
+    "patience": 0
+   }
+  },
+  "depends_on": [],
+  "est_min": 0.0,
+  "job_id": "eegnet_ea__split_fm__f0__s0__emo9__base"
+ },
+ {
+  "kind": "train",
+  "config": "tsception_ea",
+  "protocol": "split_fm_lco",
+  "fold": 0,
+  "seed": 0,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "max_subjects": 3,
+   "hparams": {
+    "epochs": 1,
+    "patience": 0
+   }
+  },
+  "depends_on": [],
+  "est_min": 0.0,
+  "job_id": "tsception_ea__split_fm_lco__f0__s0__emo9__base"
+ },
+ {
+  "kind": "train",
+  "config": "cbramod_ft_official",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 0,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "max_subjects": 3,
+   "hparams": {
+    "epochs": 1,
+    "patience": 0
+   }
+  },
+  "depends_on": [],
+  "est_min": 0.0,
+  "job_id": "cbramod_ft_official__split_fm__f0__s0__emo9__base"
+ },
+ {
+  "kind": "train",
+  "config": "cbramod_lora_r2",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 0,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": true,
+  "n_perm": 0,
+  "overrides": {
+   "max_subjects": 3,
+   "hparams": {
+    "epochs": 1,
+    "patience": 0
+   }
+  },
+  "depends_on": [],
+  "est_min": 0.0,
+  "job_id": "cbramod_lora_r2__split_fm__f0__s0__emo9__base"
+ },
+ {
+  "kind": "train",
+  "config": "cbramod_lora_r2_ea",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 0,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "max_subjects": 3,
+   "hparams": {
+    "epochs": 1,
+    "patience": 0
+   }
+  },
+  "depends_on": [],
+  "est_min": 0.0,
+  "job_id": "cbramod_lora_r2_ea__split_fm__f0__s0__emo9__base"
+ }
+]

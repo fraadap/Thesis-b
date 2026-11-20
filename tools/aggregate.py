@@ -1,0 +1,240 @@
+"""Aggrega i risultati scaricati da Kaggle e produce tabelle (markdown + CSV), test statistici e grafici.
+
+    python tools/aggregate.py results_account1_nbA.zip results_account2_nbB.zip --out analysis/
+    python tools/aggregate.py incollato.json --out analysis/     # blocco JSON copiato dalla chat
+
+Input accettati: zip `results_*.zip`, file `rows_*.jsonl`, cartelle `pianob_state`, oppure il JSON compatto
+(PIANOB_JSON_BEGIN ... END; i punteggi sono già mediati su seed e fold per soggetto).
+
+Famiglia confermativa (Holm, pre-registrata):
+  H1 il pretraining aiuta:        cbramod_ft_official vs cbramod_scratch_ft (split_fm)
+  H2 l'allineamento aiuta:        tsception_ea vs tsception_noalign (split_fm)
+  H3 Δstim corretto > 0:          modello migliore su split_fm_lco (default tsception_ea, --best per cambiarlo)
+  H4 ΔEMG > controllo casuale:    BA(4-30 Hz, senza 8 canali casuali) - BA(4-30 Hz, senza bordo) > 0
+Tutto il resto è ESPLORATIVO.
+"""
+from __future__ import annotations
+
+import argparse
+import io
+import json
+import re
+import sys
+import zipfile
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from pianob.eval.shortcuts import delta_emg, delta_stim  # noqa: E402
+from pianob.eval.stats import holm, mde_paired, nadeau_bengio, paired_test  # noqa: E402
+from pianob.report import gate1, main_view, markdown_table, summarize  # noqa: E402
+
+
+def _rows_from_lines(lines):
+    return [json.loads(l) for l in lines if l.strip()]
+
+
+def _compact_to_rows(cj: dict) -> list[dict]:
+    rows = []
+    for g in cj.get("groups", []):
+        config, protocol, task, variant, cond = g["k"]
+        for s, bw, bt in zip(g["subj"], g["bw"], g["bt"]):
+            rows.append({"config": config, "protocol": protocol, "task": task, "variant": variant,
+                         "test_condition": cond, "subject": s, "ba_win": bw, "ba_trial": bt, "seed": -1, "fold": -1,
+                         "kappa": np.nan, "f1w": np.nan})
+    return rows
+
+
+def load_inputs(paths) -> tuple[pd.DataFrame, list[dict], list[dict]]:
+    rows, jobs, compact = [], [], []
+    for p in map(Path, paths):
+        if p.suffix == ".zip":
+            with zipfile.ZipFile(p) as z:
+                for n in z.namelist():
+                    if re.search(r"results/rows_.*\.jsonl$", n):
+                        rows += _rows_from_lines(io.TextIOWrapper(z.open(n)).read().splitlines())
+                    elif re.search(r"results/jobs_.*\.jsonl$", n):
+                        jobs += _rows_from_lines(io.TextIOWrapper(z.open(n)).read().splitlines())
+        elif p.is_dir():
+            for f in p.rglob("rows_*.jsonl"):
+                rows += _rows_from_lines(f.read_text().splitlines())
+            for f in p.rglob("jobs_*.jsonl"):
+                jobs += _rows_from_lines(f.read_text().splitlines())
+        elif p.suffix == ".jsonl":
+            target = jobs if p.name.startswith("jobs_") else rows
+            target += _rows_from_lines(p.read_text().splitlines())
+        else:
+            txt = p.read_text()
+            m = re.search(r"PIANOB_JSON_BEGIN\s*(\{.*\})\s*PIANOB_JSON_END", txt, re.S)
+            cj = json.loads(m.group(1) if m else txt)
+            compact.append(cj)
+            rows += _compact_to_rows(cj)
+    df = pd.DataFrame(rows)
+    if not df.empty:
+        df = df.drop_duplicates(subset=["config", "protocol", "fold", "seed", "variant", "test_condition", "task",
+                                        "subject"], keep="last")
+    return df, jobs, compact
+
+
+def subj_series(df, config, protocol="split_fm", variant="base", cond="all", task="emo9", metric="ba_win"):
+    d = df[(df.config == config) & (df.protocol == protocol) & (df.variant == variant) &
+           (df.test_condition == cond) & (df.task == task)]
+    return d.groupby("subject")[metric].mean() if not d.empty else None
+
+
+def paired(df, a, b, **kw):
+    sa, sb = subj_series(df, a, **kw), subj_series(df, b, **kw)
+    if sa is None or sb is None:
+        return None
+    idx = sa.index.intersection(sb.index)
+    return paired_test(sa[idx].values, sb[idx].values)
+
+
+def primary_hypotheses(df, best: str) -> dict:
+    res = {}
+    r = paired(df, "cbramod_ft_official", "cbramod_scratch_ft")
+    if r:
+        res["H1_pretraining"] = r
+    r = paired(df, "tsception_ea", "tsception_noalign")
+    if r:
+        res["H2_allineamento"] = r
+    d = delta_stim(df, best, "split_fm_lco")
+    if d and "corr" in d:
+        c = np.array(d["corr"], float)
+        res["H3_delta_stim_corr"] = {**paired_test(c, np.zeros_like(c)), "model": best}
+    e = delta_emg(df, best if best.startswith("tsception") else "tsception_ea")
+    if e and "bp4_30_rand8" in e and "bp4_30_noedge" in e:
+        res["H4_emg_vs_controllo"] = paired_test(np.array(e["bp4_30_rand8"], float), np.array(e["bp4_30_noedge"], float))
+    ps = {k: v["p"] for k, v in res.items() if "p" in v}
+    for k, p in holm(ps).items():
+        res[k]["p_holm"] = p
+    return res
+
+
+def exploratory(df) -> dict:
+    out = {}
+    pairs = [("eegnet_ea", "eegnet_noalign"), ("cbramod_lora_r2_ea", "cbramod_lora_r2"),
+             ("cbramod_lora_r2", "cbramod_ft_official"), ("tsception_ea", "de_asym_lr"),
+             ("cbramod_lora_r2", "tsception_ea"), ("cbramod_ft_official", "tsception_ea"),
+             ("de_asym_lr_zsub", "de_asym_lr"), ("tsception_ea_bnalpha", "tsception_ea")]
+    for a, b in pairs:
+        kw = {}
+        if a.endswith("_bnalpha"):
+            sa = subj_series(df, a, variant="bnalpha_session_n0sel")
+            sb = subj_series(df, b)
+            if sa is not None and sb is not None:
+                idx = sa.index.intersection(sb.index)
+                out[f"{a}(session,n0sel) vs {b}"] = paired_test(sa[idx].values, sb[idx].values)
+            continue
+        r = paired(df, a, b, **kw)
+        if r:
+            out[f"{a} vs {b}"] = r
+    return out
+
+
+def power_gate(df, a="tsception_ea", b="de_asym_lr") -> dict:
+    """Dopo lnso10: SD delle differenze appaiate per soggetto -> effetto minimo rilevabile (n = 123)."""
+    sa, sb = subj_series(df, a, protocol="lnso10"), subj_series(df, b, protocol="lnso10")
+    if sa is None or sb is None:
+        return {"status": "lnso10 non ancora disponibile"}
+    idx = sa.index.intersection(sb.index)
+    d = sa[idx] - sb[idx]
+    sd = float(d.std(ddof=1))
+    mde = mde_paired(sd, len(idx))
+    # Nadeau-Bengio sui 10 fold (differenza media per fold)
+    folds = {}
+    for config in (a, b):
+        x = df[(df.config == config) & (df.protocol == "lnso10") & (df.variant == "base") & (df.task == "emo9")]
+        folds[config] = x.groupby("fold")["ba_win"].mean()
+    nb = nadeau_bengio((folds[a] - folds[b]).dropna().values, n_train=111, n_test=12) if all(len(v) for v in folds.values()) else {}
+    return {"configs": [a, b], "n": len(idx), "sd_diff": sd, "mde": mde, "mde_over_2pt": bool(mde > 0.02),
+            "nadeau_bengio": nb}
+
+
+def plots(df, out: Path):
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        return
+    s = summarize(main_view(df))
+    for proto, conds in (("split_fm", ["all"]), ("split_fm_lco", ["seen", "unseen"])):
+        x = s[(s.protocol == proto) & (s.variant == "base") & (s.task == "emo9")]
+        if x.empty:
+            continue
+        configs = sorted(x.config.unique(), key=lambda c: x[x.config == c].ba_win.max())
+        fig, ax = plt.subplots(figsize=(8, 0.4 * len(configs) + 1.5))
+        h = 0.8 / len(conds)
+        for i, cond in enumerate(conds):
+            y = [x[(x.config == c) & (x.test_condition == cond)].ba_win.mean() for c in configs]
+            e = [x[(x.config == c) & (x.test_condition == cond)].ba_win_sd_subj.mean() / np.sqrt(
+                max(1, x[(x.config == c) & (x.test_condition == cond)].n_subj.mean())) for c in configs]
+            ax.barh(np.arange(len(configs)) + i * h, y, h, xerr=e, label=cond)
+        ax.axvline(1 / 9, color="gray", ls="--", lw=1, label="caso (1/9)")
+        ax.set_yticks(np.arange(len(configs)) + h * (len(conds) - 1) / 2, configs)
+        ax.set_xlabel("BA a livello di finestra (media per soggetto)")
+        ax.set_title(proto)
+        ax.legend(loc="lower right", fontsize=8)
+        fig.tight_layout()
+        fig.savefig(out / f"ba_{proto}.png", dpi=150)
+        plt.close(fig)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("inputs", nargs="+")
+    ap.add_argument("--out", default="analysis")
+    ap.add_argument("--best", default="tsception_ea", help="modello per H3 (Δstim corretto)")
+    a = ap.parse_args()
+    out = Path(a.out)
+    out.mkdir(parents=True, exist_ok=True)
+    df, jobs, compact = load_inputs(a.inputs)
+    if df.empty:
+        sys.exit("nessun risultato negli input")
+    s = summarize(main_view(df))
+    s.to_csv(out / "tabella_principale.csv", index=False)
+    md = ["# Risultati Piano B (FACED)\n", markdown_table(s, 1000), ""]
+    g1 = gate1(jobs) if jobs else next((c.get("gate1") for c in compact if c.get("gate1")), {})
+    md.append(f"**Gate 1**: {g1}\n")
+    md.append("## Ipotesi primarie (Holm sulla famiglia di 4)\n")
+    prim = primary_hypotheses(df, a.best)
+    for k, v in prim.items():
+        md.append(f"- **{k}**: diff media {v['mean_diff']:.4f}, mediana {v['median_diff']:.4f}, dz {v.get('dz', np.nan):.2f}, "
+                  f"IC95 {np.round(v.get('ci95', [np.nan, np.nan]), 4).tolist()}, peggiorati {v.get('frac_worse', np.nan):.2f}, "
+                  f"p {v.get('p', np.nan):.4g} ({v.get('test')}), p Holm {v.get('p_holm', np.nan):.4g}, n {v['n']}")
+    md.append("\n## Indici di scorciatoia\n")
+    for c in sorted(df.config.unique()):
+        for p in ("split_fm_lco", "lnso10_lco"):
+            d = delta_stim(df, c, p)
+            if d:
+                md.append(f"- Δstim {c} [{p}]: grezzo {d['raw_mean']:.4f}" +
+                          (f", permutato {d['perm_mean']:.4f}, corretto {d['corr_mean']:.4f}" if "corr_mean" in d else ""))
+        e = delta_emg(df, c)
+        if e and len(e) > 2:
+            md.append(f"- ΔEMG {c}: " + ", ".join(f"{k[6:]} {e[k]:.4f}" for k in e if k.startswith("delta_")))
+    md.append("\n## Confronti esplorativi (non corretti)\n")
+    for k, v in exploratory(df).items():
+        md.append(f"- {k}: diff {v['mean_diff']:.4f}, dz {v.get('dz', np.nan):.2f}, p {v.get('p', np.nan):.4g} ({v.get('test')}), n {v['n']}")
+    md.append(f"\n## Gate di potenza (lnso10)\n\n{power_gate(df)}\n")
+    probes = {j["job_id"]: j["clip_probe"] for j in jobs if "clip_probe" in j}
+    for c in compact:
+        for k, v in c.get("job_extra", {}).items():
+            if "clip_probe" in v:
+                probes[k] = v["clip_probe"]
+    if probes:
+        md.append("## Sonda dell'identità della clip\n")
+        for k, v in probes.items():
+            md.append(f"- {k}: accuratezza clip {v['clip_acc']:.3f} (caso {v['clip_chance']:.3f}), "
+                      f"BA da clip->categoria {v['ba_from_clip']:.3f}")
+    (out / "risultati.md").write_text("\n".join(md) + "\n")
+    json.dump({"primary": prim}, open(out / "ipotesi_primarie.json", "w"), indent=1, default=str)
+    plots(df, out)
+    print("\n".join(md))
+    print(f"\n-> {out}/risultati.md, tabella_principale.csv, grafici PNG")
+
+
+if __name__ == "__main__":
+    main()
