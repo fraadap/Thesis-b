@@ -1,0 +1,187 @@
+"""Riepilogo compatto da copiare in chat (tabella markdown + JSON) e zip dei risultati."""
+from __future__ import annotations
+
+import json
+import zipfile
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from . import kaggle_env
+
+GATE1_TARGET = 0.5509
+GATE1_TOL = 0.02
+
+
+def load_rows(paths=None) -> pd.DataFrame:
+    paths = paths or sorted((kaggle_env.state_dir() / "results").glob("rows_*.jsonl"))
+    recs = []
+    for p in paths:
+        for line in Path(p).read_text().splitlines():
+            if line.strip():
+                recs.append(json.loads(line))
+    df = pd.DataFrame(recs)
+    if not df.empty:
+        df = df.drop_duplicates(subset=["config", "protocol", "fold", "seed", "variant", "test_condition",
+                                        "task", "subject"], keep="last")
+    return df
+
+
+def load_jobs(paths=None) -> list[dict]:
+    paths = paths or sorted((kaggle_env.state_dir() / "results").glob("jobs_*.jsonl"))
+    out = {}
+    for p in paths:
+        for line in Path(p).read_text().splitlines():
+            if line.strip():
+                r = json.loads(line)
+                out[r["job_id"]] = r
+    return list(out.values())
+
+
+KEYS = ["config", "protocol", "task", "variant", "test_condition"]
+
+
+def main_view(df: pd.DataFrame) -> pd.DataFrame:
+    """Per tabelle e JSON compatto: delle varianti BN-α tiene solo n0 scelto in validation (n0sel) e
+    la ristima pura (n00); le permutazioni restano solo nei file completi."""
+    if df.empty:
+        return df
+    v = df.variant.astype(str)
+    bn = v.str.contains("bnalpha_")
+    keep = ~bn | v.str.endswith("_n0sel") | (v.str.endswith("_n00") & ~v.str.contains("_first"))
+    return df[keep & ~v.str.contains(r"(?:^|_)perm\d+", regex=True)]
+
+
+def summarize(df: pd.DataFrame) -> pd.DataFrame:
+    """Per gruppo: media su soggetti della BA mediata su seed (e fold); sd tra soggetti; sd tra seed."""
+    if df.empty:
+        return df
+    rows = []
+    for key, g in df.groupby(KEYS):
+        per_subj = g.groupby("subject")[["ba_win", "ba_trial", "kappa", "f1w"]].mean()
+        per_seed = g.groupby("seed")["ba_win"].mean()
+        rows.append({**dict(zip(KEYS, key)), "n_subj": len(per_subj), "n_seeds": g.seed.nunique(),
+                     "n_folds": g.fold.nunique(),
+                     "ba_win": per_subj.ba_win.mean(), "ba_win_sd_subj": per_subj.ba_win.std(),
+                     "ba_win_sd_seed": per_seed.std() if len(per_seed) > 1 else np.nan,
+                     "ba_trial": per_subj.ba_trial.mean(), "kappa": per_subj.kappa.mean(),
+                     "f1w": per_subj.f1w.mean()})
+    return pd.DataFrame(rows)
+
+
+def markdown_table(s: pd.DataFrame, max_rows: int = 200) -> str:
+    if s.empty:
+        return "(nessun risultato)"
+    s = s.sort_values(KEYS)
+    lines = ["| config | protocollo | task | variante | condizione | sogg. | seed | BA finestra | BA trial | κ | F1w |",
+             "|---|---|---|---|---|---|---|---|---|---|---|"]
+    for _, r in s.head(max_rows).iterrows():
+        sd_seed = "" if pd.isna(r.ba_win_sd_seed) else f" (seed sd {r.ba_win_sd_seed:.3f})"
+        lines.append(f"| {r.config} | {r.protocol} | {r.task} | {r.variant} | {r.test_condition} | {r.n_subj} | "
+                     f"{r.n_seeds} | {r.ba_win:.4f} ± {r.ba_win_sd_subj:.3f}{sd_seed} | {r.ba_trial:.4f} | "
+                     f"{r.kappa:.4f} | {r.f1w:.4f} |")
+    return "\n".join(lines)
+
+
+def gate1(jobs: list[dict]) -> dict:
+    """Gate 1: cbramod_ft_official su split_fm, BA a livello di finestra *pooled* (come il paper)."""
+    vals = [j["pooled_all"]["ba_win"] for j in jobs
+            if j.get("config") == "cbramod_ft_official" and "__split_fm__" in j["job_id"]
+            and j["job_id"].endswith("__emo9__base") and "pooled_all" in j]
+    if not vals:
+        return {"status": "non ancora eseguito"}
+    m = float(np.mean(vals))
+    return {"n_seeds": len(vals), "ba_pooled_mean": round(m, 4), "per_seed": [round(v, 4) for v in vals],
+            "target": GATE1_TARGET, "status": "PASSATO" if abs(m - GATE1_TARGET) <= GATE1_TOL else
+            ("NON PASSATO" if len(vals) >= 3 else "parziale")}
+
+
+def compact_json(df: pd.DataFrame, jobs: list[dict], account: str) -> dict:
+    """Medie per gruppo + punteggi per soggetto (mediati su seed e fold), arrotondati a 3 decimali."""
+    out = {"v": 1, "account": account, "version": kaggle_env.code_version(), "groups": [], "gate1": gate1(jobs)}
+    if not df.empty:
+        for key, g in df.groupby(KEYS):
+            ps = g.groupby("subject")[["ba_win", "ba_trial"]].mean()
+            out["groups"].append({"k": list(key), "n_seeds": int(g.seed.nunique()), "subj": ps.index.tolist(),
+                                  "bw": np.round(ps.ba_win.values, 3).tolist(),
+                                  "bt": np.round(ps.ba_trial.values, 3).tolist()})
+    extra = {}
+    for j in jobs:
+        for k in ("clip_probe", "bnalpha_n0_selected", "perm_all", "perm_unseen", "testperm_all", "testperm_unseen"):
+            if k in j:
+                extra.setdefault(j["job_id"], {})[k] = j[k]
+    out["job_extra"] = extra
+    hpo = {}
+    for p in (kaggle_env.state_dir() / "hpo_best").glob("*.json"):
+        hpo[p.stem] = json.loads(p.read_text())
+    out["hpo_best"] = hpo
+    return out
+
+
+def shortcut_summary(df: pd.DataFrame) -> dict:
+    from .eval.shortcuts import delta_emg, delta_stim
+    out = {"stim": {}, "emg": {}}
+    if df.empty:
+        return out
+    for c in sorted(df.config.unique()):
+        for p in ("split_fm_lco", "lnso10_lco"):
+            d = delta_stim(df, c, p)
+            if d:
+                out["stim"][f"{c}|{p}"] = {k: (np.round(v, 3).tolist() if isinstance(v, list) and k != "subjects" else v)
+                                           for k, v in d.items()}
+        e = delta_emg(df, c)
+        if e and len(e) > 2:
+            out["emg"][c] = {k: (np.round(v, 3).tolist() if isinstance(v, list) and k != "subjects" else v)
+                             for k, v in e.items()}
+    return out
+
+
+def shortcut_lines(sc: dict) -> list[str]:
+    lines = []
+    for k, d in sc.get("stim", {}).items():
+        lines.append(f"- Δstim {k}: grezzo {d['raw_mean']:.4f}"
+                     + (f", permutato {d['perm_mean']:.4f}, corretto {d['corr_mean']:.4f}" if "corr_mean" in d else "")
+                     + f" ({len(d['subjects'])} soggetti, {d['n_perm_runs']} run permutati)")
+    for c, e in sc.get("emg", {}).items():
+        ks = [k for k in e if k.startswith("delta_")]
+        lines.append(f"- ΔEMG {c} (BA piena - BA variante): " + ", ".join(f"{k[6:]} {e[k]:.4f}" for k in ks))
+    return lines
+
+
+def print_summary(account: str = "account", max_rows: int = 200) -> dict:
+    df = load_rows()
+    jobs = load_jobs()
+    s = summarize(main_view(df))
+    print("\n## Riepilogo risultati\n")
+    print(markdown_table(s, max_rows))
+    g1 = gate1(jobs)
+    print(f"\n**Gate 1 (riproduzione CBraMod, BA pooled finestra, target {GATE1_TARGET} ± {GATE1_TOL})**: {g1}")
+    for line in shortcut_lines(shortcut_summary(df)):
+        print(line)
+    cj = compact_json(main_view(df), jobs, account)
+    cj["shortcuts"] = shortcut_summary(df)
+    txt = json.dumps(cj, separators=(",", ":"))
+    print("\n## JSON compatto (copialo tutto in chat)\n")
+    print("PIANOB_JSON_BEGIN")
+    print(txt)
+    print("PIANOB_JSON_END")
+    kaggle_env.write_json(kaggle_env.working_dir() / f"summary_{account}.json", cj)
+    return cj
+
+
+def make_results_zip(account: str) -> Path:
+    st = kaggle_env.state_dir()
+    out = kaggle_env.working_dir() / f"results_{account}.zip"
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        for sub in ("results", "done", "hpo_best", "bench", "logs", "optuna"):
+            for f in (st / sub).rglob("*"):
+                if f.is_file():
+                    z.write(f, f"{kaggle_env.STATE_DIRNAME}/{f.relative_to(st)}")
+        for f in (st / "artifacts" / "preds").glob("*.npz"):
+            z.write(f, f"{kaggle_env.STATE_DIRNAME}/{f.relative_to(st)}")
+        s = kaggle_env.working_dir() / f"summary_{account}.json"
+        if s.exists():
+            z.write(s, s.name)
+    print(f"[zip] {out} ({out.stat().st_size / 2**20:.1f} MB)")
+    return out
