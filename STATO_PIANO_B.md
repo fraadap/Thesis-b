@@ -115,6 +115,15 @@ Poi provare AMP disattivato (`hparams.amp=False`): la run ufficiale è in fp32.
 
 ## Problemi aperti
 
+- **Artefatti di grande ampiezza nel processed ufficiale** (packing del 2026-11-21, std mediana 9.1 µV):
+  - sub023: canale A2 rotto in quasi tutte le clip (fino a ~327 000 µV);
+  - sub030: OZ e PO4 in molte clip (std del soggetto ~5270 µV);
+  - sub004: picco breve su OZ nella clip 17;
+  - sub120 (soggetto di test): picco fino a ~6900 µV, sotto la soglia del float16.
+
+  Oltre ±65 000 µV i campioni sono saturati (limite del float16) e registrati in `meta.json`. Riguarda solo soggetti di training dello split dei foundation model, quindi l'effetto sul Gate 1 dovrebbe essere trascurabile.
+  Non escludiamo soggetti, per restare confrontabili con la letteratura. Da valutare una variante di sensibilità con clipping robusto per canale (per esempio ±k·MAD) nel loader.
+
 - REVE-Base rinviato. C'è solo lo stub: 69M parametri, codice remoto, checkpoint da verificare.
 - Tuning annidato per fold (facoltativo, solo TSception) non ancora in coda.
 - Le stime dei tempi sono a priori; il micro-benchmark le ricalibra alla prima run.
