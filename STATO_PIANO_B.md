@@ -119,7 +119,10 @@ Poi provare AMP disattivato (`hparams.amp=False`): la run ufficiale è in fp32.
   - sub023: canale A2 rotto in quasi tutte le clip (fino a ~327 000 µV);
   - sub030: OZ e PO4 in molte clip (std del soggetto ~5270 µV);
   - sub004: picco breve su OZ nella clip 17;
-  - sub120 (soggetto di test): picco fino a ~6900 µV, sotto la soglia del float16.
+  - sub120 (soggetto di test): picco fino a ~6900 µV, sotto la soglia del float16;
+  - non saturati ma oltre 2000 µV: sub003 (~10 900), sub056 (~24 200), sub064 (~43 100), tutti di training.
+
+  Nessun soggetto di validation (sub080-099) supera 2000 µV.
 
   Oltre ±65 000 µV i campioni sono saturati (limite del float16) e registrati in `meta.json`. Riguarda solo soggetti di training dello split dei foundation model, quindi l'effetto sul Gate 1 dovrebbe essere trascurabile.
   Non escludiamo soggetti, per restare confrontabili con la letteratura. Da valutare una variante di sensibilità con clipping robusto per canale (per esempio ±k·MAD) nel loader.
