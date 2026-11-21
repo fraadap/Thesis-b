@@ -84,7 +84,23 @@ def bench_config(name: str, device: str, steps: int = 6) -> dict:
 PROTOCOL_FACTOR = {"split_fm": 1.0, "split_fm_lco": 0.75, "lnso10": 1.35, "lnso10_lco": 1.0}
 
 
-def estimate_job(job: Job, bench: dict) -> float:
+def empirical_minutes() -> dict:
+    """Minuti mediani effettivi per (config, protocollo) dai job già completati (anche di sessioni
+    precedenti): più affidabili del micro-benchmark, che sovrastima i job con early stopping."""
+    from .experiments.queue import DONE_STATUSES, done_status
+    acc: dict = {}
+    for jid, r in done_status().items():
+        parts = jid.split("__")
+        if r["status"] in DONE_STATUSES and len(parts) >= 5 and r.get("minutes"):
+            acc.setdefault((parts[0], parts[1]), []).append(float(r["minutes"]))
+    return {k: float(np.median(v)) for k, v in acc.items() if len(v) >= 2}
+
+
+def estimate_job(job: Job, bench: dict, empirical: dict | None = None) -> float:
+    if empirical and job.kind == "train" and not job.overrides.get("max_subjects"):
+        e = empirical.get((job.config, job.protocol)) or empirical.get((job.config, "split_fm"))
+        if e is not None:
+            return 1.2 * e
     if job.kind == "report":
         return 1.0
     if job.overrides.get("max_subjects"):

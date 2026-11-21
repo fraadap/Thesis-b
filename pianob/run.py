@@ -27,7 +27,7 @@ def _n_gpus() -> int:
 
 
 def worker_loop(queue_path: str, worker: str, synthetic: bool, device: str) -> None:
-    from .bench import estimate_job
+    from .bench import empirical_minutes, estimate_job
     from .data.adapters import FacedAdapter
     from .experiments.jobs import Context, run_job
     from .experiments.queue import DONE_STATUSES, done_status, is_locked, load_queue, mark, release, try_claim
@@ -56,6 +56,7 @@ def worker_loop(queue_path: str, worker: str, synthetic: bool, device: str) -> N
         f"tempo residuo {guard.remaining_min():.0f} min")
     while True:
         done = done_status()
+        emp = empirical_minutes()
         ok = {k for k, v in done.items() if v["status"] in DONE_STATUSES}
         # job falliti in QUESTA sessione (anche da un altro worker): non si riprovano ora
         failed |= {k for k, v in done.items() if v["status"] == "failed" and v.get("t", 0) >= guard.t0}
@@ -74,7 +75,7 @@ def worker_loop(queue_path: str, worker: str, synthetic: bool, device: str) -> N
             if is_locked(j):
                 waiting = True
                 continue
-            est = estimate_job(j, bench)
+            est = estimate_job(j, bench, emp)
             if not guard.can_start(est):
                 skipped_time.add(j.job_id)
                 log(f"salto {j.job_id}: stima {est:.0f} min > tempo residuo {guard.remaining_min():.0f} min")

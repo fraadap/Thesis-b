@@ -15,30 +15,52 @@ def _subject_means(df: pd.DataFrame, metric: str) -> pd.Series:
 
 def delta_stim(df: pd.DataFrame, config: str, protocol: str, metric: str = "ba_win",
                base_variant: str = "base", task: str = "emo9") -> dict:
-    """Δraw = BA_seen - BA_unseen (stesso modello, soggetti di test); Δperm dagli stessi job con
-    label permutate a livello di clip (varianti 'perm*'); Δcorr = Δraw - Δperm, per soggetto."""
+    """Indice di scorciatoia dello stimolo, per soggetto (media su fold e seed).
+
+    raw        = BA_seen - BA_unseen (modello con label vere, stessi soggetti di test)
+    perm       = stessa differenza per i modelli con la mappa clip -> classe permutata
+    corr       = raw - perm  (definizione del prompt; DISTORTA, vedi sotto)
+    corr_chance= raw - (BA_seen^perm - 1/K)   (correzione raccomandata)
+
+    Perché `corr` è distorta: con label permutate (conteggi per classe preservati) il modello predice
+    per una clip non vista la label delle clip viste simili; la probabilità che la clip non vista abbia
+    la stessa label permutata è (m-1)/(N-1) (= 2/27 = 0.074 con 9 classi da 3 clip), sotto il caso 1/K.
+    Quindi BA_unseen^perm < 1/K per costruzione e `perm` sovrastima la memorizzazione.
+    `corr_chance` usa solo la parte vista dei modelli permutati: BA_seen^perm - 1/K misura la capacità
+    di memorizzare la clip; ciò che resta del divario è il vantaggio specifico dell'emozione.
+    """
     d = df[(df.config == config) & (df.protocol == protocol) & (df.task == task)]
     if d.empty:
         return {}
+    K = 9 if task == "emo9" else 2
 
-    def per_subject_delta(sub):
+    def per_subject(sub):
         piv = sub.pivot_table(index=["subject", "fold", "seed"], columns="test_condition", values=metric)
         if not {"seen", "unseen"} <= set(piv.columns):
             return None
-        return (piv["seen"] - piv["unseen"]).groupby("subject").mean()
+        return piv[["seen", "unseen"]].groupby("subject").mean()
 
-    raw = per_subject_delta(d[d.variant == base_variant])
-    if raw is None:
+    tv = per_subject(d[d.variant == base_variant])
+    if tv is None:
         return {}
-    pv = d[d.variant.str.startswith("perm")]
-    perm = per_subject_delta(pv) if not pv.empty else None
-    out = {"subjects": raw.index.tolist(), "raw": raw.values.tolist(),
-           "raw_mean": float(raw.mean()), "n_perm_runs": int(pv[["variant", "seed"]].drop_duplicates().shape[0])}
-    if perm is not None:
-        perm = perm.reindex(raw.index)
+    raw = tv["seen"] - tv["unseen"]
+    pv = d[d.variant.str.fullmatch(r"perm\d+")]
+    out = {"subjects": raw.index.tolist(), "raw": raw.values.tolist(), "raw_mean": float(raw.mean()),
+           "seen_mean": float(tv["seen"].mean()), "unseen_mean": float(tv["unseen"].mean()), "chance": 1 / K,
+           "n_perm_runs": int(pv[["variant", "seed"]].drop_duplicates().shape[0])}
+    pp = per_subject(pv) if not pv.empty else None
+    if pp is not None:
+        pp = pp.reindex(raw.index)
+        perm = pp["seen"] - pp["unseen"]
         corr = raw - perm
+        memo = pp["seen"] - 1 / K
+        corr_c = raw - memo
         out.update({"perm": perm.values.tolist(), "perm_mean": float(perm.mean()),
-                    "corr": corr.values.tolist(), "corr_mean": float(corr.mean())})
+                    "corr": corr.values.tolist(), "corr_mean": float(corr.mean()),
+                    "seen_perm_mean": float(pp["seen"].mean()), "unseen_perm_mean": float(pp["unseen"].mean()),
+                    "memorization": memo.values.tolist(), "memorization_mean": float(memo.mean()),
+                    "emotion_gain_seen_mean": float((tv["seen"] - pp["seen"]).mean()),
+                    "corr_chance": corr_c.values.tolist(), "corr_chance_mean": float(corr_c.mean())})
     return out
 
 

@@ -34,10 +34,18 @@ BA a livello di finestra, media su 23 soggetti di test, 9 classi; caso = 0.111.
 
 Letture:
 - Sulle clip non viste tutti i modelli sono vicini al caso (0.12–0.145): quasi tutto il vantaggio sopra il caso nello split FM dipende dalla clip.
-- Il Δstim corretto delle baseline su feature è negativo (da −0.03 a −0.04): con label permutate a livello di clip il divario viste/non viste è uguale o maggiore. Da verificare sui file completi (BA viste/non viste separate per le permutazioni).
+- **Correzione del Δstim (decisione 2026-11-21).** La formula del prompt, Δraw − Δperm, è distorta. Con label permutate (3 clip per classe), una clip non vista prende la label delle clip viste simili con probabilità 2/27 = 0.074 < 1/9: nei dati BA_unseen^perm = 0.076–0.079. Per questo il Δcorr del prompt è negativo per costruzione (da −0.03 a −0.04).
+  - Nuova correzione principale, `corr_chance`: Δraw − (BA_seen^perm − 1/K). In più si riportano la memorizzazione (BA_seen^perm − 1/K) e il guadagno specifico dell'emozione sulle clip viste (BA_seen − BA_seen^perm).
+  - Feature: `corr_chance` ≈ 0 (da −0.008 a 0.000). Il divario viste/non viste è interamente spiegato dalla memorizzazione della clip (0.076–0.130).
+  - Il guadagno specifico dell'emozione sulle viste è +0.008/+0.012 (n.s.) e +0.029 con z-score per soggetto (p = 0.004).
+  - Da confrontare con la definizione esatta di Xu & Plataniotis.
+- Clip non viste contro il caso: log-power +0.020 (p 0.02), DE +0.009 (n.s.), DE con z-score +0.034 (p 0.006), EEGNet+EA +0.010 (n.s.), TSception+EA +0.018 (p 0.01).
+- BN-α (sessione) contro base: TSception +0.022 (p 1e-5), sulle non viste +0.009 (p 0.004); EEGNet +0.011 (p 0.001), sulle non viste +0.001 (n.s.).
 - EA: +8 punti su EEGNet (da confermare con 5 seed). BN-α: +2.3 punti su TSception, +1.1 su EEGNet; n0 scelto quasi sempre 8.
 - Le reti compatte (0.21–0.23) restano molto sotto l'EEGNet riprodotto da CBraMod (0.409) sullo stesso split. Il Gate 1 dirà se il problema sono i dati o la ricetta.
 - Optuna: TSception con finestre da 6 s e batch 32 (val 0.239); EEGNet con finestre da 4 s (val 0.273).
+
+Coda: 63/156 job in 11 h (Optuna circa 6 h per worker). Ultima sessione: TSception circa 7 min/job, EEGNet circa 8 min/job. Le stime del micro-benchmark erano 2–3 volte troppo alte; ora la guardia del tempo usa i minuti effettivi dei job completati.
 
 Mancano: TSception senza EA, EEGNet senza EA (4 seed), ablazione EMG, permutazioni del Δstim per TSception, sonda della clip, valenza binaria con TSception.
 

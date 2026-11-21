@@ -144,9 +144,12 @@ def shortcut_summary(df: pd.DataFrame) -> dict:
 def shortcut_lines(sc: dict) -> list[str]:
     lines = []
     for k, d in sc.get("stim", {}).items():
-        lines.append(f"- Δstim {k}: grezzo {d['raw_mean']:.4f}"
-                     + (f", permutato {d['perm_mean']:.4f}, corretto {d['corr_mean']:.4f}" if "corr_mean" in d else "")
-                     + f" ({len(d['subjects'])} soggetti, {d['n_perm_runs']} run permutati)")
+        line = (f"- Δstim {k}: viste {d['seen_mean']:.3f}, non viste {d['unseen_mean']:.3f}, grezzo {d['raw_mean']:.4f}")
+        if "corr_mean" in d:
+            line += (f"; permutate viste {d['seen_perm_mean']:.3f} / non viste {d['unseen_perm_mean']:.3f}; "
+                     f"memorizzazione {d['memorization_mean']:.4f}; corretto (vs caso) {d['corr_chance_mean']:.4f}; "
+                     f"corretto (prompt, distorto) {d['corr_mean']:.4f}")
+        lines.append(line + f" ({len(d['subjects'])} soggetti, {d['n_perm_runs']} run permutati)")
     for c, e in sc.get("emg", {}).items():
         ks = [k for k in e if k.startswith("delta_")]
         lines.append(f"- ΔEMG {c} (BA piena - BA variante): " + ", ".join(f"{k[6:]} {e[k]:.4f}" for k in ks))

@@ -9,7 +9,8 @@ Input accettati: zip `results_*.zip`, file `rows_*.jsonl`, cartelle `pianob_stat
 Famiglia confermativa (Holm, pre-registrata):
   H1 il pretraining aiuta:        cbramod_ft_official vs cbramod_scratch_ft (split_fm)
   H2 l'allineamento aiuta:        tsception_ea vs tsception_noalign (split_fm)
-  H3 Δstim corretto > 0:          modello migliore su split_fm_lco (default tsception_ea, --best per cambiarlo)
+  H3 Δstim corretto > 0:          modello migliore su split_fm_lco (default tsception_ea, --best per cambiarlo);
+                                  correzione rispetto al caso (corr_chance, vedi eval/shortcuts.delta_stim)
   H4 ΔEMG > controllo casuale:    BA(4-30 Hz, senza 8 canali casuali) - BA(4-30 Hz, senza bordo) > 0
 Tutto il resto è ESPLORATIVO.
 """
@@ -101,8 +102,8 @@ def primary_hypotheses(df, best: str) -> dict:
     if r:
         res["H2_allineamento"] = r
     d = delta_stim(df, best, "split_fm_lco")
-    if d and "corr" in d:
-        c = np.array(d["corr"], float)
+    if d and "corr_chance" in d:
+        c = np.array(d["corr_chance"], float)
         res["H3_delta_stim_corr"] = {**paired_test(c, np.zeros_like(c)), "model": best}
     e = delta_emg(df, best if best.startswith("tsception") else "tsception_ea")
     if e and "bp4_30_rand8" in e and "bp4_30_noedge" in e:
@@ -210,8 +211,10 @@ def main():
         for p in ("split_fm_lco", "lnso10_lco"):
             d = delta_stim(df, c, p)
             if d:
-                md.append(f"- Δstim {c} [{p}]: grezzo {d['raw_mean']:.4f}" +
-                          (f", permutato {d['perm_mean']:.4f}, corretto {d['corr_mean']:.4f}" if "corr_mean" in d else ""))
+                md.append(f"- Δstim {c} [{p}]: viste {d['seen_mean']:.3f}, non viste {d['unseen_mean']:.3f}, grezzo {d['raw_mean']:.4f}" +
+                          (f"; permutate viste {d['seen_perm_mean']:.3f} / non viste {d['unseen_perm_mean']:.3f}; "
+                           f"memorizzazione {d['memorization_mean']:.4f}; corretto (vs caso) {d['corr_chance_mean']:.4f}; "
+                           f"corretto (prompt) {d['corr_mean']:.4f}" if "corr_mean" in d else ""))
         e = delta_emg(df, c)
         if e and len(e) > 2:
             md.append(f"- ΔEMG {c}: " + ", ".join(f"{k[6:]} {e[k]:.4f}" for k in e if k.startswith("delta_")))
