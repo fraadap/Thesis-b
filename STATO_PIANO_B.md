@@ -4,6 +4,10 @@ Ultimo aggiornamento: 2026-11-20 (sessione 01: pipeline completa su FACED per Ka
 
 ## Obiettivo
 
+**Perimetro attuale (decisione 2026-11-21):** l'unico dataset è FACED e l'unico foundation model è CBraMod.
+- MUSIN-G, NMED-T, EREMUS, SEED e REVE sono un'eventuale espansione successiva.
+- Nel codice restano solo come stub e hook dormienti, che nessuna coda usa: `DatasetAdapter`, `stimulus_holdout_plans`, stub REVE.
+
 Benchmark del riconoscimento delle emozioni da EEG su FACED (123 soggetti, 28 clip, 9 classi) con hold-out congiunto di soggetti e stimoli, foundation model (CBraMod) e allineamento per soggetto.
 
 Contributo atteso:
