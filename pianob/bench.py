@@ -81,7 +81,8 @@ def bench_config(name: str, device: str, steps: int = 6) -> dict:
     return {"sec_step": sec_step, "epoch_min": epoch_s / 60, "job_min_split_fm": job_min, "epochs_expected": exp_epochs}
 
 
-PROTOCOL_FACTOR = {"split_fm": 1.0, "split_fm_lco": 0.75, "lnso10": 1.35, "lnso10_lco": 1.0}
+PROTOCOL_FACTOR = {"split_fm": 1.0, "split_fm_lco": 0.75, "lnso10": 1.35, "lnso10_lco": 1.0,
+                   "split_fm_sizematched": 0.75, "lnso10_sizematched": 1.0}
 
 
 def empirical_minutes() -> dict:
@@ -98,7 +99,9 @@ def empirical_minutes() -> dict:
 
 def estimate_job(job: Job, bench: dict, empirical: dict | None = None) -> float:
     if empirical and job.kind == "train" and not job.overrides.get("max_subjects"):
-        e = empirical.get((job.config, job.protocol)) or empirical.get((job.config, "split_fm"))
+        e = empirical.get((job.config, job.protocol)) \
+            or empirical.get((job.config, job.protocol.replace("_sizematched", "_lco"))) \
+            or empirical.get((job.config, "split_fm"))
         if e is not None:
             return 1.2 * e
     if job.kind == "report":

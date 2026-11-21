@@ -46,11 +46,8 @@ def prepare(job: Job, ctx: Context, cfg: ExpConfig) -> JobData:
     ad = ctx.adapter
     lab = ad.labels(job.task)
     task_clips = ad.task_clips(job.task)
-    split = make_split(job.protocol, job.fold, task_clips, ad.subjects(), clip_labels=ad.meta["clip_labels"])
-    k = job.overrides.get("max_subjects")
-    if k:  # solo smoke test
-        split = Split(split.protocol, split.fold, split.train_subjects[:k], split.val_subjects[:max(1, k // 2)],
-                      split.test_subjects[:max(1, k // 2)], split.train_clips, split.unseen_clips)
+    split = make_split(job.protocol, job.fold, task_clips, ad.subjects(), clip_labels=ad.meta["clip_labels"],
+                       draw=job.draw or 0, max_subjects=job.overrides.get("max_subjects"))
     if job.perm is not None:
         lab = permute_clip_labels(lab, job.perm, task_clips)
     kept = kept_channels(ad.channel_names(), job.drop)
@@ -65,9 +62,18 @@ def prepare(job: Job, ctx: Context, cfg: ExpConfig) -> JobData:
 def load_aligned(ctx: Context, jd: JobData, subjects, clips, fit_clips, band, win_len: int,
                  rescale: float | None = None) -> np.ndarray:
     """(n_subj * n_clips, C, T) float16, allineati per soggetto sulle sole clip `fit_clips`."""
+    return load_aligned_per_subject(ctx, jd, [(s, list(clips), list(fit_clips)) for s in subjects],
+                                    band, win_len, rescale)
+
+
+def load_aligned_per_subject(ctx: Context, jd: JobData, plan, band, win_len: int,
+                             rescale: float | None = None) -> np.ndarray:
+    """plan = [(soggetto, clip, clip_per_l'allineamento)]: le clip possono variare per soggetto
+    (protocolli *_sizematched). Trial concatenati nell'ordine del piano."""
     cfg = jd.cfg
-    out = None
-    for i, s in enumerate(subjects):
+    n = sum(len(c) for _, c, _ in plan)
+    out, i = None, 0
+    for s, clips, fit_clips in plan:
         x = ctx.adapter.trials([s], clips, channels=jd.channels, band=band)[0]      # (n_clip, C, T)
         if cfg.align != "none":
             fit = x[[clips.index(c) for c in fit_clips]]
@@ -75,9 +81,37 @@ def load_aligned(ctx: Context, jd: JobData, subjects, clips, fit_clips, band, wi
             if rescale is not None:
                 x = x * np.float32(rescale)
         if out is None:
-            out = np.empty((len(subjects), *x.shape), dtype=np.float16)
-        out[i] = x.astype(np.float16)
-    return out.reshape(-1, *out.shape[2:])
+            out = np.empty((n, *x.shape[1:]), dtype=np.float16)
+        out[i:i + len(clips)] = x.astype(np.float16)
+        i += len(clips)
+    return out
+
+
+def _train_plan(sp: Split):
+    return [(s, sp.subject_train_clips(s), sp.subject_train_clips(s)) for s in sp.train_subjects]
+
+
+def _plan_meta(plan, clip_labels):
+    s = np.concatenate([np.full(len(c), sub) for sub, c, _ in plan])
+    c = np.concatenate([np.asarray(c) for _, c, _ in plan])
+    return s, c, np.asarray(clip_labels)[c]
+
+
+def _test_clips(sp: Split, conds: dict) -> list[int]:
+    """Clip caricate per i soggetti di test. Per *_sizematched si carica l'intera sessione (come nel
+    leave-clip-out), così l'allineamento dei soggetti di test è identico e gli esempi T_k coincidono."""
+    ev = sorted({c for cl in conds.values() for c in cl})
+    return sorted(set(ev) | set(sp.all_clips)) if sp.is_sizematched else ev
+
+
+def tk_conditions(sp: Split) -> dict:
+    """Valutazione aggiuntiva dei protocolli con clip condivise (split_fm, lnso10) sui sottoinsiemi T_k:
+    serve come BA_full nella scomposizione quantità di dati / novità dello stimolo."""
+    if sp.is_lco or sp.is_sizematched or sp.protocol not in ("split_fm", "lnso10"):
+        return {}
+    from ..data.splits import heldout_sets
+    return {f"tk{k}": [c for c in v if c in sp.train_clips]
+            for k, v in heldout_sets(task_clips=sp.all_clips or sp.train_clips).items()}
 
 
 def _trial_meta(subjects, clips, clip_labels):
@@ -192,16 +226,19 @@ def _feature_cache(ctx: Context, cfg: ExpConfig, jd: JobData, band, subjects) ->
 
 
 def _xy(feats, subjects, clips, clip_labels, zsub_clips=None):
+    """`clips` / `zsub_clips`: lista comune oppure funzione soggetto -> lista (protocolli *_sizematched)."""
     X, S, Cc = [], [], []
     for s in subjects:
         F = feats[s]
-        if zsub_clips is not None:  # z-score per soggetto sulle clip disponibili (label-free)
-            ref = F[zsub_clips].reshape(-1, F.shape[-1])
+        cl = clips(s) if callable(clips) else clips
+        zc = zsub_clips(s) if callable(zsub_clips) else zsub_clips
+        if zc is not None:  # z-score per soggetto sulle clip disponibili (label-free)
+            ref = F[zc].reshape(-1, F.shape[-1])
             F = (F - ref.mean(0)) / (ref.std(0) + 1e-8)
-        Fx = F[clips]
+        Fx = F[cl]
         X.append(Fx.reshape(-1, F.shape[-1]))
         S.append(np.full(Fx.shape[0] * Fx.shape[1], s))
-        Cc.append(np.repeat(clips, Fx.shape[1]))
+        Cc.append(np.repeat(cl, Fx.shape[1]))
     X, S, Cc = np.concatenate(X), np.concatenate(S), np.concatenate(Cc)
     return X, S, Cc, np.asarray(clip_labels)[Cc]
 
@@ -235,20 +272,23 @@ def run_features(job: Job, ctx: Context, cfg: ExpConfig) -> str:
     t0 = time.time()
     jd = prepare(job, ctx, cfg)
     sp = jd.split
-    conds = _conditions(jd)
-    all_eval = sorted({c for cl in conds.values() for c in cl})
+    conds = {**_conditions(jd), **tk_conditions(sp)}
+    all_eval = _test_clips(sp, conds)
     subs = sp.train_subjects + sp.val_subjects + sp.test_subjects
     feats = _feature_cache(ctx, cfg, jd, job.band, subs)
     z = cfg.feature_zsub
 
     def data(lab):
-        tr = _xy(feats, sp.train_subjects, sp.train_clips, lab, sp.train_clips if z else None)
+        tr = _xy(feats, sp.train_subjects, sp.subject_train_clips, lab, sp.subject_train_clips if z else None)
         va = _xy(feats, sp.val_subjects, sp.train_clips, lab, sp.train_clips if z else None)
         te = {cond: _xy(feats, sp.test_subjects, cl, lab, all_eval if z else None) for cond, cl in conds.items()}
         return tr, va, te
 
     tr, va, te = data(jd.clip_labels)
-    check_windows_in_split(tr[1], tr[2], sp.train_subjects, sp.train_clips, "train")
+    allowed = sorted(set().union(*[sp.subject_train_clips(s) for s in sp.train_subjects]))
+    check_windows_in_split(tr[1], tr[2], sp.train_subjects, allowed, "train")
+    if sp.is_sizematched:
+        _check_train_size(sp, len(tr[1]) // max(1, sp.n_train_trials()), len(tr[1]), job)
     best = (-1, None, None)
     grid = []
     for kind in cfg.hp("clf", ["lr"]):
@@ -261,8 +301,9 @@ def run_features(job: Job, ctx: Context, cfg: ExpConfig) -> str:
                 best = (score, kind, C)
     _, kind, C = best
     model = _fit_clf(kind, C, tr[0], tr[3], job.seed)
-    rows, rec = [], {"job_id": job.job_id, "config": cfg.name, "clf": kind, "C": C, "val_ba": best[0], "grid": grid}
-    extra = env_extra(ctx, 0)
+    rows, rec = [], {"job_id": job.job_id, "config": cfg.name, "clf": kind, "C": C, "val_ba": best[0], "grid": grid,
+                     **_size_info(sp)}
+    extra = {**env_extra(ctx, 0), **_draw_extra(sp)}
     preds = {}
     for cond, (X, S, Cc, y) in te.items():
         P = _proba(model, X, jd.n_classes)
@@ -282,7 +323,7 @@ def run_features(job: Job, ctx: Context, cfg: ExpConfig) -> str:
             for cond, (X, S, Cc, y) in tek.items():
                 ev = evaluate_predictions(_proba(mk, X, jd.n_classes), S, Cc, y)
                 null[cond].append(subject_mean(ev["per_subject"]))
-                if sp.is_lco:  # serve per la correzione del Δstim, per soggetto
+                if sp.is_lco or sp.is_sizematched:  # serve per la correzione del Δstim, per soggetto
                     rows += result_rows(job, cfg.name, ev, cond, _join(job.variant, f"perm{k}"), extra)
         for cond in conds:
             obs = subject_mean(evaluate_predictions(*preds[cond])["per_subject"])
@@ -298,6 +339,29 @@ def run_features(job: Job, ctx: Context, cfg: ExpConfig) -> str:
     return "completed"
 
 
+def _check_train_size(sp: Split, windows_per_trial: int, n_windows: int, job: Job) -> None:
+    """Numero di finestre di training identico al fold leave-clip-out corrispondente."""
+    from ..data.splits import make_split
+    lco = make_split(sp.protocol.replace("_sizematched", "_lco"), sp.fold, sp.all_clips, None,
+                     max_subjects=job.overrides.get("max_subjects"))
+    lco_trials = sum(len(lco.subject_train_clips(s)) for s in lco.train_subjects if s in sp.train_subjects)
+    assert n_windows == lco_trials * windows_per_trial, \
+        f"finestre di training {n_windows} != leave-clip-out {lco_trials * windows_per_trial}"
+
+
+def _size_info(sp: Split) -> dict:
+    if not sp.is_sizematched:
+        return {}
+    from ..data.splits import coverage
+    cov = coverage(sp)
+    return {"draw": sp.draw, "heldout_clips": sp.heldout_clips, "coverage": cov,
+            "coverage_frac_mean": float(np.mean(list(cov.values()))) / max(1, len(sp.train_subjects))}
+
+
+def _draw_extra(sp: Split) -> dict:
+    return {"draw": sp.draw} if sp.is_sizematched else {}
+
+
 def _join(a, b):
     return b if a == "base" else f"{a}_{b}"
 
@@ -307,18 +371,18 @@ def build_banks(job: Job, ctx: Context, jd: JobData, win_len: int, need_train=Tr
     from ..train.loop import TrialBank
     cfg, sp = jd.cfg, jd.split
     conds = _conditions(jd)
-    all_eval = sorted({c for cl in conds.values() for c in cl})
+    all_eval = _test_clips(sp, conds)
+    plan = _train_plan(sp)
     rescale = raw_rms(ctx, jd, sp.train_subjects, sp.train_clips, job.band) if cfg.align_rescale else None
     key = (job.protocol, job.fold, job.task, tuple(job.band or ()), job.drop, cfg.align, cfg.align_ref,
-           win_len, rescale is not None, tuple(jd.channels), tuple(sp.train_subjects), need_test)
+           win_len, rescale is not None, tuple(jd.channels), tuple(sp.train_subjects), need_test, sp.draw)
     if key in ctx.caches:
         arrs = ctx.caches[key]
     else:
         while len(ctx.caches) >= int(os.environ.get("PIANOB_CACHE_ENTRIES", 3)):
             ctx.caches.pop(next(iter(ctx.caches)))
         arrs = {
-            "train": load_aligned(ctx, jd, sp.train_subjects, sp.train_clips, sp.train_clips, job.band, win_len, rescale)
-            if need_train else None,
+            "train": load_aligned_per_subject(ctx, jd, plan, job.band, win_len, rescale) if need_train else None,
             "val": load_aligned(ctx, jd, sp.val_subjects, sp.train_clips, sp.train_clips, job.band, win_len, rescale),
             "test": load_aligned(ctx, jd, sp.test_subjects, all_eval, all_eval, job.band, win_len, rescale)
             if need_test else None,
@@ -327,9 +391,15 @@ def build_banks(job: Job, ctx: Context, jd: JobData, win_len: int, need_train=Tr
     dev = ctx.device
     banks = {}
     if need_train:
-        s, c, l = _trial_meta(sp.train_subjects, sp.train_clips, jd.clip_labels)
+        s, c, l = _plan_meta(plan, jd.clip_labels)
         banks["train"] = TrialBank(arrs["train"], s, c, l, win_len, jd.cfg.overlap_train, dev)
-        check_windows_in_split(banks["train"].ws.subject, banks["train"].ws.clip, sp.train_subjects, sp.train_clips, "train")
+        ws = banks["train"].ws
+        for sub in sp.train_subjects:   # nessuna finestra fuori dalle clip di training del suo soggetto
+            m = ws.subject == sub
+            check_windows_in_split(ws.subject[m], ws.clip[m], [sub], sp.subject_train_clips(sub), "train")
+        if sp.is_sizematched:
+            per_trial = len(ws.win_trial) // max(1, len(ws.trial_subject))
+            _check_train_size(sp, per_trial, banks["train"].n, job)
     s, c, l = _trial_meta(sp.val_subjects, sp.train_clips, jd.clip_labels)
     banks["val"] = TrialBank(arrs["val"], s, c, l, win_len, 0.0, dev)
     check_windows_in_split(banks["val"].ws.subject, banks["val"].ws.clip, sp.val_subjects, sp.train_clips, "val")
@@ -387,13 +457,15 @@ def run_neural(job: Job, ctx: Context, cfg: ExpConfig, hp_source: str) -> str:
            "pretrained": getattr(model, "pretrained_info", None)}
     from ..eval.shortcuts import test_label_permutation
     conds = _conditions(jd)
-    for cond, clips in conds.items():
+    rec.update(_size_info(sp))
+    extra.update(_draw_extra(sp))
+    for cond, clips in {**conds, **tk_conditions(sp)}.items():
         m = np.isin(test.ws.clip, clips)
         ev = evaluate_predictions(P[m], test.ws.subject[m], test.ws.clip[m], test.ws.label[m])
         rows += result_rows(job, cfg.name, ev, cond, job.variant, extra)
         rec[f"pooled_{cond}"] = ev["pooled"]
         rec[f"confusion_{cond}"] = ev["confusion_win"]
-        if job.perm is None:
+        if job.perm is None and cond in conds:
             rec[f"testperm_{cond}"] = test_label_permutation(P[m], test.ws.subject[m], test.ws.clip[m],
                                                              test.ws.label[m], n_perm=1000, seed=job.seed)
     # predizioni salvate (servono a permutazioni/analisi successive)
@@ -403,7 +475,8 @@ def run_neural(job: Job, ctx: Context, cfg: ExpConfig, hp_source: str) -> str:
                         clip=test.ws.clip, label=test.ws.label)
 
     # BN-α (regime offline e online), n0 scelto sulla validation
-    if cfg.tta_bnalpha and has_bn(model) and job.perm is None and not job.overrides.get("skip_tta"):
+    if cfg.tta_bnalpha and has_bn(model) and job.perm is None and not job.overrides.get("skip_tta") \
+            and not sp.is_sizematched:
         val_out = bnalpha_predict(model, banks["val"], ctx.device, n0_list=(8, 32, 128), first_n=(), stream=False)
         vs = {k: subject_mean(evaluate_predictions(v, banks["val"].ws.subject, banks["val"].ws.clip,
                                                    banks["val"].ws.label)["per_subject"]) for k, v in val_out.items()}

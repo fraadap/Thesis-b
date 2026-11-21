@@ -28,6 +28,7 @@ class Job:
     band: list | None = None        # es. [4, 30]
     drop: str | None = None         # edge8 | rand8_d{k} | edge8_mastoids
     perm: int | None = None         # permutazione delle label a livello di clip
+    draw: int | None = None         # estrazione del sottocampionamento (protocolli *_sizematched)
     n_trials: int = 0               # hpo
     shard: int = 0                  # hpo: più worker sullo stesso studio
     probe: bool = False             # sonda dell'identità della clip a fine training
@@ -47,6 +48,8 @@ class Job:
             parts.append("noedgemast")
         elif self.drop:
             parts.append(self.drop.replace("_", ""))
+        if self.draw is not None:
+            parts.append(f"draw{self.draw}")
         if self.perm is not None:
             parts.append(f"perm{self.perm}")
         if self.overrides.get("tag"):
@@ -69,6 +72,7 @@ class Job:
     @staticmethod
     def from_dict(d):
         d = {k: v for k, v in d.items() if k != "job_id"}
+        d.setdefault("draw", None)
         return Job(**d)
 
 
@@ -128,8 +132,19 @@ def _folds(protocol):
     return range(n_folds(protocol))
 
 
-def train_jobs(config, protocols, seeds, task="emo9", **kw) -> list[Job]:
-    return [Job("train", config, p, f, s, task, **kw) for p in protocols for f in _folds(p) for s in seeds]
+def train_jobs(config, protocols, seeds, task="emo9", draws=(None,), **kw) -> list[Job]:
+    return [Job("train", config, p, f, s, task, draw=d, **kw)
+            for p in protocols for d in draws for f in _folds(p) for s in seeds]
+
+
+def sizematched_jobs(config, seeds, draws, n_perm_models=0, protocol="split_fm_sizematched", deps=(),
+                     **kw) -> list[Job]:
+    """Controllo della quantità di dati: seed x estrazioni x 3 fold di clip, più modelli con label
+    permutate a livello di clip (estrazione 0, seed 0) per la correzione di Δstim^size."""
+    J = train_jobs(config, [protocol], seeds, draws=draws, depends_on=list(deps), **kw)
+    J += [Job("train", config, protocol, f, 0, draw=draws[0], perm=k, depends_on=list(deps), **kw)
+          for k in range(n_perm_models) for f in _folds(protocol)]
+    return J
 
 
 def hpo_jobs(study, n_trials, n_shards=2) -> list[Job]:
@@ -191,6 +206,12 @@ def queue_nbA() -> list[Job]:
     J += train_jobs("tsception_noalign", ["split_fm"], SEEDS5, depends_on=dt)
     J += train_jobs("eegnet_noalign", ["split_fm"], SEEDS5, depends_on=de)
     J += emg_jobs("tsception_ea", SEEDS5, n_draws=5, deps=dt)
+    # controllo della quantità di dati per il leave-clip-out (dopo l'ablazione EMG)
+    J += sizematched_jobs("tsception_ea", SEEDS5, draws=[0, 1], n_perm_models=5, deps=dt)
+    J += [Job("train", "de_asym_lr_zsub", "split_fm_sizematched", f, 0, draw=d, n_perm=50)
+          for d in (0, 1) for f in _folds("split_fm_sizematched")]
+    # BA_full su T_k per la baseline su feature (il job split_fm originale non aveva le condizioni tk)
+    J += [Job("train", "de_asym_lr_zsub", "split_fm", 0, 0, overrides={"tag": "tkeval"})]
     J += perm_jobs("tsception_ea", "split_fm_lco", perms=range(5), deps=dt)
     J += [Job("train", "tsception_ea", "split_fm", 0, 0, probe=True, overrides={"tag": "probe"}, depends_on=dt)]
     J += train_jobs("tsception_ea", ["split_fm"], SEEDS3, task="val2", depends_on=dt)
@@ -213,6 +234,7 @@ def queue_nbC() -> list[Job]:
     J += train_jobs("cbramod_lora_r2", ["split_fm_lco"], SEEDS5)
     J += train_jobs("cbramod_ft_official", ["split_fm_lco"], SEEDS5)
     J += train_jobs("cbramod_lora_r2_ea", ["split_fm", "split_fm_lco"], SEEDS3)
+    J += sizematched_jobs("cbramod_lora_r2", SEEDS3, draws=[0], n_perm_models=2)   # prima dell'ablazione EMG
     J += emg_jobs("cbramod_lora_r2", SEEDS3, n_draws=3, one_seed_per_draw=True)
     J += [Job("train", "cbramod_lora_r2", "split_fm", 0, 0, probe=True, overrides={"tag": "probe"})]
     J += perm_jobs("cbramod_lora_r2", "split_fm_lco", perms=range(3))
@@ -232,6 +254,9 @@ def queue_nbD(final_configs=("tsception_ea", "cbramod_lora_r2", "de_asym_lr")) -
             J += train_jobs(c, ["lnso10"], SEEDS3) + train_jobs(c, ["lnso10_lco"], [0])
         else:
             J += train_jobs(c, ["lnso10", "lnso10_lco"], SEEDS3)
+    # controllo della quantità di dati: solo per le 2 config finali, 1 seed x 1 estrazione
+    for c in final_configs[:2]:
+        J += train_jobs(c, ["lnso10_sizematched"], [0], draws=[0])
     return J
 
 

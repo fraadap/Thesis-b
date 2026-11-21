@@ -21,11 +21,26 @@ def load_rows(paths=None) -> pd.DataFrame:
         for line in Path(p).read_text().splitlines():
             if line.strip():
                 recs.append(json.loads(line))
+    recs += _tk_rows_from_state(recs)
     df = pd.DataFrame(recs)
     if not df.empty:
         df = df.drop_duplicates(subset=["config", "protocol", "fold", "seed", "variant", "test_condition",
                                         "task", "subject"], keep="last")
     return df
+
+
+def _tk_rows_from_state(recs) -> list[dict]:
+    """BA_full su T_k per i job split_fm/lnso10 completati prima che esistesse la condizione 'tk{k}'."""
+    from .eval.shortcuts import tk_rows_from_preds
+    have = {(r["config"], r["protocol"], r["fold"], r["seed"], r["task"], r["variant"])
+            for r in recs if str(r.get("test_condition", "")).startswith("tk")}
+    out = []
+    for f in sorted((kaggle_env.state_dir() / "artifacts" / "preds").glob("*.npz")):
+        p = f.stem.split("__")
+        if len(p) == 6 and (p[0], p[1], int(p[2][1:]), int(p[3][1:]), p[4], p[5]) not in have:
+            with np.load(f) as z:
+                out += tk_rows_from_preds(f.stem, z)
+    return out
 
 
 def load_jobs(paths=None) -> list[dict]:
@@ -73,6 +88,8 @@ def summarize(df: pd.DataFrame) -> pd.DataFrame:
 def markdown_table(s: pd.DataFrame, max_rows: int = 200) -> str:
     if s.empty:
         return "(nessun risultato)"
+    # le condizioni tk{k} dei protocolli con clip condivise servono solo alla scomposizione
+    s = s[~(s.test_condition.astype(str).str.startswith("tk") & s.protocol.isin(["split_fm", "lnso10"]))]
     s = s.sort_values(KEYS)
     lines = ["| config | protocollo | task | variante | condizione | sogg. | seed | BA finestra | BA trial | κ | F1w |",
              "|---|---|---|---|---|---|---|---|---|---|---|"]
@@ -124,8 +141,8 @@ def compact_json(df: pd.DataFrame, jobs: list[dict], account: str) -> dict:
 
 
 def shortcut_summary(df: pd.DataFrame) -> dict:
-    from .eval.shortcuts import delta_emg, delta_stim
-    out = {"stim": {}, "emg": {}}
+    from .eval.shortcuts import delta_emg, delta_stim, stim_decomposition
+    out = {"stim": {}, "emg": {}, "decomposition": {}}
     if df.empty:
         return out
     for c in sorted(df.config.unique()):
@@ -134,6 +151,10 @@ def shortcut_summary(df: pd.DataFrame) -> dict:
             if d:
                 out["stim"][f"{c}|{p}"] = {k: (np.round(v, 3).tolist() if isinstance(v, list) and k != "subjects" else v)
                                            for k, v in d.items()}
+        for bp in ("split_fm", "lnso10"):
+            dec = stim_decomposition(df, c, bp)
+            if dec:
+                out["decomposition"][f"{c}|{bp}"] = dec
         e = delta_emg(df, c)
         if e and len(e) > 2:
             out["emg"][c] = {k: (np.round(v, 3).tolist() if isinstance(v, list) and k != "subjects" else v)
@@ -150,6 +171,9 @@ def shortcut_lines(sc: dict) -> list[str]:
                      f"memorizzazione {d['memorization_mean']:.4f}; corretto (vs caso) {d['corr_chance_mean']:.4f}; "
                      f"corretto (prompt, distorto) {d['corr_mean']:.4f}")
         lines.append(line + f" ({len(d['subjects'])} soggetti, {d['n_perm_runs']} run permutati)")
+    from .eval.shortcuts import decomposition_lines
+    for k, dec in sc.get("decomposition", {}).items():
+        lines += decomposition_lines(dec, k)
     for c, e in sc.get("emg", {}).items():
         ks = [k for k in e if k.startswith("delta_")]
         lines.append(f"- ΔEMG {c} (BA piena - BA variante): " + ", ".join(f"{k[6:]} {e[k]:.4f}" for k in ks))

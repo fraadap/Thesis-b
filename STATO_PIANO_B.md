@@ -56,7 +56,7 @@ Mancano: TSception senza EA, EEGNet senza EA (4 seed), ablazione EMG, permutazio
    - account 1 → notebook A (baseline e TSception);
    - account 2 → notebook B (**Gate 1**).
 3. Gate 1 passato → account 3 → notebook C (serve l'Optuna di LoRA dal notebook B).
-4. Gate 2: tabelle complete su `split_fm` e `split_fm_lco` con `tools/aggregate.py`.
+4. Gate 2: tabelle complete su `split_fm`, `split_fm_lco` e `split_fm_sizematched` con `tools/aggregate.py`, inclusa la scomposizione quantità di dati / novità dello stimolo.
 5. Scegliere le config finali → rigenerare `queues/nbD_lnso10.json` → `lnso10` / `lnso10_lco` → gate di potenza.
 6. Sessione successiva:
    - preprocessing dai raw (Picard + ICLabel) per l'analisi EMG estesa e per le clip intere;
@@ -128,6 +128,31 @@ Poi provare AMP disattivato (`hparams.amp=False`): la run ufficiale è in fp32.
   - L'ipotesi primaria H4 confronta direttamente BA(4–30 Hz, senza 8 casuali) con BA(4–30 Hz, senza bordo).
 - **Δstim:** Δcorr = Δraw − Δperm per soggetto, come da prompt. Δperm viene da riaddestramenti con la mappa clip → classe permutata (conteggi per classe preservati).
 - **Holm:** solo sulle 4 ipotesi primarie (`tools/aggregate.py`); il resto è esplorativo.
+- **Controllo della quantità di dati per il leave-clip-out (decisione 2026-11-21).**
+  - *Motivo.* Il leave-clip-out addestra su meno trial (18–19 clip su 28 per soggetto; su MUSIN-G sarebbero 9 brani su 12). Una parte del calo rispetto alle clip condivise può quindi dipendere dalla riduzione dei dati e non dalla novità dello stimolo.
+  - *Protocollo `split_fm_sizematched`* (`lnso10_sizematched` solo per le 2 config finali). Per ogni fold di clip k:
+    - stessi soggetti di training, validation e test del leave-clip-out;
+    - ogni soggetto di training usa un sottoinsieme casuale di clip, diverso per soggetto, con la stessa numerosità e composizione per classe del fold k: 2 clip per emozione + le neutre previste;
+    - le clip T_k sono viste da circa 2/3 dei soggetti di training;
+    - la validation è identica al leave-clip-out (clip di training del fold, senza T_k);
+    - il test è sugli stessi esempi della condizione "unseen": stessi soggetti, clip T_k, stesso allineamento (EA stimato sull'intera sessione).
+  - *Asserzioni:*
+    - finestre di training identiche al fold leave-clip-out;
+    - composizione per classe identica per ogni soggetto;
+    - ogni clip di T_k vista da almeno un soggetto.
+  - *Estrazioni:* seed di sottocampionamento registrato (`draw`); almeno 2 estrazioni per TSception.
+  - *Scomposizione per soggetto, con IC bootstrap.* BA_full è il modello split_fm valutato su T_k (condizioni `tk0..2`, ricavate anche dalle predizioni salvate dei job già completati).
+    - BA_full − BA_unseen = (BA_full − BA_size) [quantità di dati] + (BA_size − BA_unseen) [Δstim^size];
+    - Δstim^size è corretto per permutazione con la stessa correzione "rispetto al caso" dell'indice appaiato: Δstim^size − (BA_size^perm − 1/K);
+    - si riporta anche la differenza Δstim^size corretto − indice appaiato corretto, che misura l'effetto della diversità degli stimoli in training. Va riportata anche se le due stime divergono.
+  - *Ipotesi H3 di Holm:* diventa "Δstim^size > 0, corretto per permutazione". L'indice appaiato resta come stima di robustezza.
+  - *Budget:* circa 10 GPU-h su T4.
+    - TSception: 5 seed × 2 estrazioni × 3 fold, più 5 modelli permutati × 3 fold (circa 5 h);
+    - CBraMod LoRA: 3 seed × 1 estrazione × 3 fold, più 2 permutati × 3 fold (circa 5 h);
+    - DE con z-score: 2 estrazioni con 50 permutazioni interne, su CPU.
+
+    BN-α non si calcola sui job sizematched.
+  - *Dataset musicali:* stessa logica predisposta in `DatasetAdapter.stimulus_holdout_plans` (MUSIN-G 9/12, NMED-T 8/10), valutata sugli stessi brani tenuti fuori.
 
 **Budget**
 - **`lnso10_lco` di CBraMod con 1 seed** (30 job) per restare nel budget; 3 seed su `lnso10`.

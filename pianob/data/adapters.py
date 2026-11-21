@@ -58,6 +58,25 @@ class DatasetAdapter(ABC):
         lab = self.labels(task)
         return int(lab[lab >= 0].max() + 1)
 
+    # Hook per il controllo quantità di dati / novità dello stimolo (leave-stimulus-out contro stimoli
+    # condivisi sottocampionati, valutati sugli stessi stimoli tenuti fuori). Per FACED gli strati sono
+    # le classi della clip; per i brani musicali (label = rating del soggetto) un unico strato.
+    N_HELDOUT_STIMULI: int | None = None
+
+    def stimulus_strata(self, task: str | None = None) -> dict:
+        if task is None:
+            return {c: 0 for c in self.stimuli()}
+        lab = self.labels(task)
+        return {c: int(lab[c]) for c in self.stimuli() if lab[c] >= 0}
+
+    def stimulus_holdout_plans(self, subjects, draw: int = 0, task: str | None = None, seed: int = 0) -> list[dict]:
+        from .splits import stimulus_folds, stimulus_holdout_plan
+        assert self.N_HELDOUT_STIMULI, f"{self.name}: N_HELDOUT_STIMULI non definito"
+        strata = self.stimulus_strata(task)
+        stim = sorted(strata)
+        return [stimulus_holdout_plan(subjects, stim, h, draw, strata, fold=k)
+                for k, h in enumerate(stimulus_folds(stim, self.N_HELDOUT_STIMULI, seed))]
+
     # Hook per la Proposta 2 (ISC/MIL): tutte le finestre di un trial come bag.
     def trial_bag(self, subject: int, clip: int, win_samples: int, stride: int | None = None, **kw):
         x = self.trials([subject], [clip], **kw)[0, 0]
@@ -266,6 +285,7 @@ class _StubAdapter(DatasetAdapter):
 
 class MusinGAdapter(_StubAdapter):
     name = "musin_g"
+    N_HELDOUT_STIMULI = 3   # leave-song-out 9/12 contro 12 brani sottocampionati a 9 per soggetto
     NOTES = """TODO MUSIN-G (OpenNeuro ds003774): 20 soggetti, EGI 128 canali -> mappare a 32 per nome 10-20;
 fs eterogenea 250/1000 Hz (ricampionare a 200); 12 brani da ~1.5-2 min, ascolto unico, occhi chiusi;
 rating 1-5 con 1 = massimo gradimento (INVERTIRE); presenza dei WAV non verificata."""
@@ -273,6 +293,7 @@ rating 1-5 con 1 = massimo gradimento (INVERTIRE); presenza dei WAV non verifica
 
 class NmedTAdapter(_StubAdapter):
     name = "nmed_t"
+    N_HELDOUT_STIMULI = 2   # leave-song-out 8/10 contro 10 brani sottocampionati a 8 per soggetto
     NOTES = """TODO NMED-T (Stanford): 20 soggetti, 128 canali a 1 kHz; versione cleaned 125 Hz/125 canali con
 low-pass 50 Hz; 10 brani da ~4.5 min; rating 1-9; audio non incluso."""
 

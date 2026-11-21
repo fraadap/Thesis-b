@@ -9,8 +9,10 @@ Input accettati: zip `results_*.zip`, file `rows_*.jsonl`, cartelle `pianob_stat
 Famiglia confermativa (Holm, pre-registrata):
   H1 il pretraining aiuta:        cbramod_ft_official vs cbramod_scratch_ft (split_fm)
   H2 l'allineamento aiuta:        tsception_ea vs tsception_noalign (split_fm)
-  H3 Δstim corretto > 0:          modello migliore su split_fm_lco (default tsception_ea, --best per cambiarlo);
-                                  correzione rispetto al caso (corr_chance, vedi eval/shortcuts.delta_stim)
+  H3 Δstim^size corretto > 0:     modello migliore (default tsception_ea, --best per cambiarlo): BA_size - BA_unseen
+                                  sugli stessi esempi T_k, a parità di quantità di dati, corretto per permutazione
+                                  a livello di clip (eval/shortcuts.stim_decomposition). L'indice appaiato
+                                  (viste vs non viste, stesso modello) resta come stima di robustezza.
   H4 ΔEMG > controllo casuale:    BA(4-30 Hz, senza 8 canali casuali) - BA(4-30 Hz, senza bordo) > 0
 Tutto il resto è ESPLORATIVO.
 """
@@ -28,7 +30,8 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pianob.eval.shortcuts import delta_emg, delta_stim  # noqa: E402
+from pianob.eval.shortcuts import (decomposition_lines, delta_emg, delta_stim, stim_decomposition,  # noqa: E402
+                                   tk_rows_from_preds)
 from pianob.eval.stats import holm, mde_paired, nadeau_bengio, paired_test  # noqa: E402
 from pianob.report import gate1, main_view, markdown_table, summarize  # noqa: E402
 
@@ -49,7 +52,7 @@ def _compact_to_rows(cj: dict) -> list[dict]:
 
 
 def load_inputs(paths) -> tuple[pd.DataFrame, list[dict], list[dict]]:
-    rows, jobs, compact = [], [], []
+    rows, jobs, compact, pred_rows = [], [], [], []
     for p in map(Path, paths):
         if p.suffix == ".zip":
             with zipfile.ZipFile(p) as z:
@@ -58,11 +61,17 @@ def load_inputs(paths) -> tuple[pd.DataFrame, list[dict], list[dict]]:
                         rows += _rows_from_lines(io.TextIOWrapper(z.open(n)).read().splitlines())
                     elif re.search(r"results/jobs_.*\.jsonl$", n):
                         jobs += _rows_from_lines(io.TextIOWrapper(z.open(n)).read().splitlines())
+                    elif re.search(r"artifacts/preds/.*\.npz$", n):
+                        with np.load(io.BytesIO(z.read(n))) as npz:
+                            pred_rows += tk_rows_from_preds(Path(n).stem, npz)
         elif p.is_dir():
             for f in p.rglob("rows_*.jsonl"):
                 rows += _rows_from_lines(f.read_text().splitlines())
             for f in p.rglob("jobs_*.jsonl"):
                 jobs += _rows_from_lines(f.read_text().splitlines())
+            for f in p.rglob("artifacts/preds/*.npz"):
+                with np.load(f) as npz:
+                    pred_rows += tk_rows_from_preds(f.stem, npz)
         elif p.suffix == ".jsonl":
             target = jobs if p.name.startswith("jobs_") else rows
             target += _rows_from_lines(p.read_text().splitlines())
@@ -72,8 +81,10 @@ def load_inputs(paths) -> tuple[pd.DataFrame, list[dict], list[dict]]:
             cj = json.loads(m.group(1) if m else txt)
             compact.append(cj)
             rows += _compact_to_rows(cj)
-    df = pd.DataFrame(rows)
+    df = pd.DataFrame(rows + pred_rows)   # le righe salvate dai job hanno la precedenza (keep="first" sotto)
     if not df.empty:
+        df = df.drop_duplicates(keep="first", subset=["config", "protocol", "fold", "seed", "variant",
+                                                      "test_condition", "task", "subject"])
         df = df.drop_duplicates(subset=["config", "protocol", "fold", "seed", "variant", "test_condition", "task",
                                         "subject"], keep="last")
     return df, jobs, compact
@@ -101,10 +112,11 @@ def primary_hypotheses(df, best: str) -> dict:
     r = paired(df, "tsception_ea", "tsception_noalign")
     if r:
         res["H2_allineamento"] = r
-    d = delta_stim(df, best, "split_fm_lco")
-    if d and "corr_chance" in d:
-        c = np.array(d["corr_chance"], float)
-        res["H3_delta_stim_corr"] = {**paired_test(c, np.zeros_like(c)), "model": best}
+    dec = stim_decomposition(df, best, "split_fm")
+    if dec and "dstim_size_corr" in dec:
+        c = np.array(dec["dstim_size_corr"]["per_subject"], float)
+        c = c[~np.isnan(c)]
+        res["H3_delta_stim_size_corr"] = {**paired_test(c, np.zeros_like(c)), "model": best}
     e = delta_emg(df, best if best.startswith("tsception") else "tsception_ea")
     if e and "bp4_30_rand8" in e and "bp4_30_noedge" in e:
         res["H4_emg_vs_controllo"] = paired_test(np.array(e["bp4_30_rand8"], float), np.array(e["bp4_30_noedge"], float))
@@ -218,6 +230,10 @@ def main():
         e = delta_emg(df, c)
         if e and len(e) > 2:
             md.append(f"- ΔEMG {c}: " + ", ".join(f"{k[6:]} {e[k]:.4f}" for k in e if k.startswith("delta_")))
+    md.append("\n## Quantità di dati contro novità dello stimolo\n")
+    for c in sorted(df.config.unique()):
+        for bp in ("split_fm", "lnso10"):
+            md += decomposition_lines(stim_decomposition(df, c, bp), f"{c} [{bp}]")
     md.append("\n## Confronti esplorativi (non corretti)\n")
     for k, v in exploratory(df).items():
         md.append(f"- {k}: diff {v['mean_diff']:.4f}, dz {v.get('dz', np.nan):.2f}, p {v.get('p', np.nan):.4g} ({v.get('test')}), n {v['n']}")

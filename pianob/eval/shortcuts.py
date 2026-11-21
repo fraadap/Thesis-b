@@ -137,3 +137,123 @@ def test_label_permutation(probs, subj, clip, label, n_perm: int = 1000, seed: i
     null = np.array([score(clip_lab[rng.permutation(len(clips))]) for _ in range(n_perm)])
     return {"observed": float(obs), "null_mean": float(null.mean()), "null_p95": float(np.percentile(null, 95)),
             "p": float((1 + np.sum(null >= obs)) / (1 + n_perm)), "n_perm": n_perm}
+
+
+# ------------------------------------------------------------------ quantità di dati vs novità dello stimolo
+def _per_subject_k(d: pd.DataFrame, cond_of_k, metric: str) -> pd.DataFrame:
+    """Tabella soggetto x k (fold di clip), mediata su seed ed estrazioni."""
+    d = d.copy()
+    d["k"] = d.apply(cond_of_k, axis=1)
+    d = d[d.k.notna()]
+    if d.empty:
+        return pd.DataFrame()
+    return d.pivot_table(index="subject", columns="k", values=metric, aggfunc="mean")
+
+
+def stim_decomposition(df: pd.DataFrame, config: str, base_protocol: str = "split_fm", metric: str = "ba_win",
+                       task: str = "emo9") -> dict:
+    """Scomposizione per soggetto (media sui fold di clip k presenti in tutte le condizioni):
+
+        BA_full - BA_unseen = (BA_full - BA_size) + (BA_size - BA_unseen)
+                               quantità di dati     Δstim^size
+
+    BA_full   = modello con clip condivise (split_fm / lnso10) valutato su T_k (condizione 'tk{k}')
+    BA_size   = modello *_sizematched (stessi soggetti e finestre di training del fold k) su T_k
+    BA_unseen = modello *_lco del fold k sulle clip non viste T_k (stessi esempi di BA_size)
+    Δstim^size corretto = Δstim^size - (BA_size^perm - 1/K), con BA_size^perm dai modelli *_sizematched
+    addestrati con la mappa clip -> classe permutata (stessa correzione 'rispetto al caso' dell'indice
+    appaiato). Il confronto con l'indice appaiato corretto (stesso modello, viste vs non viste) misura
+    l'effetto della diversità degli stimoli in training: va riportato anche se diverge.
+    """
+    from .stats import paired_test
+    K = 9 if task == "emo9" else 2
+    lco, sm = base_protocol + "_lco", base_protocol + "_sizematched"
+    d = df[(df.config == config) & (df.task == task)]
+    v = d.variant.astype(str)
+
+    def k_from_cond(r):
+        c = str(r.test_condition)
+        return int(c[2:]) if c.startswith("tk") and c[2:].isdigit() else None
+
+    # 'tkeval' = rivalutazione su T_k di un job con clip condivise completato prima delle condizioni tk
+    full = _per_subject_k(d[(d.protocol == base_protocol) & v.isin(["base", "tkeval"])], k_from_cond, metric)
+    size = _per_subject_k(d[(d.protocol == sm) & v.str.fullmatch(r"draw\d+")], k_from_cond, metric)
+    sperm = _per_subject_k(d[(d.protocol == sm) & v.str.fullmatch(r"draw\d+_perm\d+")], k_from_cond, metric)
+    un = d[(d.protocol == lco) & (v == "base") & (d.test_condition == "unseen")]
+    if full.empty or size.empty or un.empty:
+        return {}
+    if (un.fold >= 0).all():
+        unseen = _per_subject_k(un, lambda r: int(r.fold) % 3, metric)
+        ks = sorted(set(full.columns) & set(size.columns) & set(unseen.columns))
+        unseen_m = unseen[ks].mean(axis=1)
+    else:  # JSON compatto: 'unseen' già mediato sui fold -> servono tutti e 3 i k
+        ks = sorted(set(full.columns) & set(size.columns))
+        if len(ks) < 3:
+            return {}
+        unseen_m = un.groupby("subject")[metric].mean()
+    if not ks:
+        return {}
+    subj = sorted(set(full.index) & set(size.index) & set(unseen_m.index))
+    f, s_, u = full.loc[subj, ks].mean(axis=1), size.loc[subj, ks].mean(axis=1), unseen_m.loc[subj]
+    comp = {"total": f - u, "data_quantity": f - s_, "dstim_size": s_ - u}
+    out = {"subjects": subj, "folds_k": ks, "ba_full": float(f.mean()), "ba_size": float(s_.mean()),
+           "ba_unseen": float(u.mean()), "chance": 1 / K}
+    if not sperm.empty and set(ks) <= set(sperm.columns):
+        sp_ = sperm.reindex(subj)[ks].mean(axis=1)
+        comp["dstim_size_corr"] = comp["dstim_size"] - (sp_ - 1 / K)
+        out["ba_size_perm"] = float(sp_.mean())
+    paired = delta_stim(df, config, lco, metric=metric, task=task)
+    if paired.get("corr_chance") is not None:
+        pc = pd.Series(paired["corr_chance"], index=paired["subjects"]).reindex(subj)
+        comp["paired_corr"] = pc
+        if "dstim_size_corr" in comp:
+            comp["size_minus_paired"] = comp["dstim_size_corr"] - pc   # effetto della diversità degli stimoli
+    for name, x in comp.items():
+        x = x.astype(float)
+        ok = x.notna()
+        out[name] = {"per_subject": np.round(x.values, 4).tolist(),
+                     **paired_test(x[ok].values, np.zeros(int(ok.sum())))}
+    return out
+
+
+def decomposition_lines(dec: dict, name: str) -> list[str]:
+    if not dec:
+        return []
+    def f(k):
+        if k not in dec:
+            return "n.d."
+        r = dec[k]
+        return f"{r['mean_diff']:+.4f} [IC95 {r['ci95'][0]:+.3f}, {r['ci95'][1]:+.3f}] p {r.get('p', float('nan')):.3g}"
+    return [f"- Scomposizione {name} (k = {dec['folds_k']}, {len(dec['subjects'])} soggetti): "
+            f"BA full {dec['ba_full']:.3f}, size {dec['ba_size']:.3f}, unseen {dec['ba_unseen']:.3f}"
+            + (f", size permutato {dec['ba_size_perm']:.3f}" if "ba_size_perm" in dec else ""),
+            f"    totale {f('total')}; quantità di dati {f('data_quantity')}; Δstim^size {f('dstim_size')}; "
+            f"Δstim^size corretto {f('dstim_size_corr')}",
+            f"    indice appaiato corretto {f('paired_corr')}; differenza (size - appaiato) = diversità degli "
+            f"stimoli {f('size_minus_paired')}"]
+
+
+def tk_rows_from_preds(job_id: str, data) -> list[dict]:
+    """Righe 'tk{k}' (BA_full su T_k) dalle predizioni salvate di un job split_fm/lnso10 già completato."""
+    from ..data.splits import heldout_sets
+    from .metrics import evaluate_predictions
+    parts = job_id.split("__")
+    if len(parts) != 6:
+        return []
+    config, protocol, fold, seed, task, variant = parts
+    if protocol not in ("split_fm", "lnso10") or variant != "base":
+        return []
+    probs = np.asarray(data["probs"], dtype=np.float32)
+    subj, clip, lab = (np.asarray(data[k]) for k in ("subject", "clip", "label"))
+    rows = []
+    for k, tk in heldout_sets(task_clips=sorted(set(clip.tolist()))).items():
+        m = np.isin(clip, tk)
+        if not m.any():
+            continue
+        ev = evaluate_predictions(probs[m], subj[m], clip[m], lab[m])
+        for s, r in ev["per_subject"].items():
+            rows.append({"config": config, "protocol": protocol, "fold": int(fold[1:]), "seed": int(seed[1:]),
+                         "variant": variant, "test_condition": f"tk{k}", "task": task, "subject": s,
+                         **{kk: (None if isinstance(vv, float) and np.isnan(vv) else vv) for kk, vv in r.items()},
+                         "source": "preds"})
+    return rows
