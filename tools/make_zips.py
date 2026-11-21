@@ -43,7 +43,9 @@ def add_tree(z: zipfile.ZipFile, base: Path, arc_prefix: str, patterns=("**/*",)
 
 def code_zip(z: zipfile.ZipFile, prefix: str = ""):
     p = (prefix + "/") if prefix else ""
-    subprocess.check_call([sys.executable, str(ROOT / "tools" / "build_notebooks.py")])
+    # i notebook NON si rigenerano qui (leggono le code da file): solo `python tools/build_notebooks.py`
+    if not list((ROOT / "notebooks").glob("*.ipynb")):
+        subprocess.check_call([sys.executable, str(ROOT / "tools" / "build_notebooks.py")])
     subprocess.check_call([sys.executable, "-m", "pianob.experiments.queue", "--out", str(ROOT / "queues")], cwd=ROOT)
     add_tree(z, ROOT / "pianob", f"{p}pianob")
     add_tree(z, ROOT / "notebooks", f"{p}notebooks", ("*.ipynb",))
