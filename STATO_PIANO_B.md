@@ -18,6 +18,29 @@ Contributo atteso:
 3. zip e upload;
 4. `nb0_smoke` su Kaggle, con l'output incollato in chat.
 
+## Risultati parziali (notebook A, prima sessione, 2026-11-21)
+
+BA a livello di finestra, media su 23 soggetti di test, 9 classi; caso = 0.111.
+
+| Modello | split FM | LCO viste | LCO non viste |
+|---|---|---|---|
+| log-power + LR | 0.200 | 0.213 | 0.131 |
+| DE + asimmetrie + LR | 0.185 | 0.196 | 0.120 |
+| DE + asimmetrie + z-score per soggetto | 0.232 | 0.270 | 0.145 |
+| EEGNet + EA (5 seed) | 0.229 | 0.260 | 0.121 |
+| EEGNet senza EA (1 seed) | 0.145 | – | – |
+| TSception + EA (5 seed) | 0.212 | 0.247 | 0.130 |
+| TSception + EA + BN-α sessione (n0 da validation) | 0.235 | 0.267 | 0.139 |
+
+Letture:
+- Sulle clip non viste tutti i modelli sono vicini al caso (0.12–0.145): quasi tutto il vantaggio sopra il caso nello split FM dipende dalla clip.
+- Il Δstim corretto delle baseline su feature è negativo (da −0.03 a −0.04): con label permutate a livello di clip il divario viste/non viste è uguale o maggiore. Da verificare sui file completi (BA viste/non viste separate per le permutazioni).
+- EA: +8 punti su EEGNet (da confermare con 5 seed). BN-α: +2.3 punti su TSception, +1.1 su EEGNet; n0 scelto quasi sempre 8.
+- Le reti compatte (0.21–0.23) restano molto sotto l'EEGNet riprodotto da CBraMod (0.409) sullo stesso split. Il Gate 1 dirà se il problema sono i dati o la ricetta.
+- Optuna: TSception con finestre da 6 s e batch 32 (val 0.239); EEGNet con finestre da 4 s (val 0.273).
+
+Mancano: TSception senza EA, EEGNet senza EA (4 seed), ablazione EMG, permutazioni del Δstim per TSception, sonda della clip, valenza binaria con TSception.
+
 ## Prossimi passi
 
 1. Smoke test su Kaggle con i dati veri. Controllare canali, ampiezze, mappa delle label e pesi.
