@@ -97,6 +97,11 @@ def gate1(jobs: list[dict]) -> dict:
             ("NON PASSATO" if len(vals) >= 3 else "parziale")}
 
 
+def _r3(v) -> list:
+    """Arrotonda a 3 decimali; NaN -> null (JSON valido)."""
+    return [None if not np.isfinite(x) else round(float(x), 3) for x in np.asarray(v, float)]
+
+
 def compact_json(df: pd.DataFrame, jobs: list[dict], account: str) -> dict:
     """Medie per gruppo + punteggi per soggetto (mediati su seed e fold), arrotondati a 3 decimali."""
     out = {"v": 1, "account": account, "version": kaggle_env.code_version(), "groups": [], "gate1": gate1(jobs)}
@@ -104,8 +109,7 @@ def compact_json(df: pd.DataFrame, jobs: list[dict], account: str) -> dict:
         for key, g in df.groupby(KEYS):
             ps = g.groupby("subject")[["ba_win", "ba_trial"]].mean()
             out["groups"].append({"k": list(key), "n_seeds": int(g.seed.nunique()), "subj": ps.index.tolist(),
-                                  "bw": np.round(ps.ba_win.values, 3).tolist(),
-                                  "bt": np.round(ps.ba_trial.values, 3).tolist()})
+                                  "bw": _r3(ps.ba_win.values), "bt": _r3(ps.ba_trial.values)})
     extra = {}
     for j in jobs:
         for k in ("clip_probe", "bnalpha_n0_selected", "perm_all", "perm_unseen", "testperm_all", "testperm_unseen"):
