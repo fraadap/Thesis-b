@@ -29,6 +29,8 @@ from scipy import signal
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from pianob.data import faced_meta as FM  # noqa: E402
 
+F16_MAX = 65000.0  # massimo rappresentabile in float16: 65504
+
 
 def sha256(path: Path) -> str:
     h = hashlib.sha256()
@@ -85,7 +87,7 @@ def main():
     if a.keep_250hz:
         X250 = np.lib.format.open_memmap(out / "faced_250hz_f16.npy", mode="w+", dtype=np.float16,
                                          shape=(n_slots, FM.N_CLIPS, len(FM.CHANNELS), FM.N_SAMPLES_PROCESSED))
-    stats, src_hash, dtypes = {}, {}, set()
+    stats, src_hash, dtypes, saturated = {}, {}, set(), {}
     t0 = time.time()
     for s in range(n_slots):
         if s not in files:
@@ -97,14 +99,22 @@ def main():
         dtypes.add(str(arr.dtype))
         r = resample(arr.astype(np.float64), a.resample)
         mx = float(np.abs(r).max())
-        assert mx < 6e4, f"sub{s:03d}: ampiezza {mx:.0f} fuori dal range float16"
+        # float16 arriva a ±65504: gli artefatti oltre F16_MAX vengono saturati e registrati in meta.json
+        over = np.abs(r) > F16_MAX
+        n_sat = int(over.sum())
+        if n_sat:
+            bad = sorted({(int(c), FM.CHANNELS[int(ch)]) for c, ch, _ in zip(*np.where(over))})
+            print(f"  ATTENZIONE sub{s:03d}: {n_sat} campioni oltre ±{F16_MAX:.0f} µV (max {mx:.0f}) "
+                  f"-> saturati. (clip, canale): {bad[:10]}")
+            r = np.clip(r, -F16_MAX, F16_MAX)
+            saturated[f"sub{s:03d}"] = {"n_samples": n_sat, "max_abs": mx, "clip_channel": bad}
         X[s] = r.astype(np.float16)
         if X250 is not None:
-            X250[s] = arr.astype(np.float16)
+            X250[s] = np.clip(arr, -F16_MAX, F16_MAX).astype(np.float16)
         ch_std = arr.std(axis=(0, 2))
-        stats[s] = {"std": float(arr.std()), "max_abs": float(np.abs(arr).max()),
+        stats[s] = {"std": float(arr.std()), "max_abs": float(np.abs(arr).max()), "n_saturated": n_sat,
                     "flat_channels": [FM.CHANNELS[i] for i in np.where(ch_std < 1e-6)[0]],
-                    "f16_rel_err": float(np.abs(X[s].astype(np.float64) - r).max() / (mx + 1e-12))}
+                    "f16_rel_err": float(np.abs(X[s].astype(np.float64) - r).max() / (min(mx, F16_MAX) + 1e-12))}
         src_hash[f"sub{s:03d}.pkl"] = sha256(files[s])
         if s % 10 == 0:
             print(f"  sub{s:03d}: std {stats[s]['std']:.2f} µV, max {stats[s]['max_abs']:.1f} ({time.time() - t0:.0f}s)")
@@ -114,6 +124,8 @@ def main():
     med = float(np.median([v for v in stds if v is not None]))
     unit_note = "microvolt (atteso)" if 1 < med < 500 else f"ATTENZIONE: std mediana {med:.3g}, unità da verificare"
     print(f"std mediana {med:.2f} -> {unit_note}")
+    if saturated:
+        print(f"Soggetti con campioni saturati: {sorted(saturated)} (dettagli in meta.json -> saturated_f16)")
     meta = {
         "dataset": "FACED", "version": 1, "created": time.strftime("%Y-%m-%d %H:%M"),
         "source": "Synapse syn50614194, Processed_data (ultimi 30 s, 0.05-47 Hz, ICA oculare, CAR)",
@@ -126,6 +138,7 @@ def main():
         "clip_index_in_category": FM.clip_index_in_category(),
         "subjects_present": sorted(files), "missing": missing, "n_subjects_slots": n_slots,
         "per_subject_std": stds, "per_subject_stats": {f"sub{s:03d}": v for s, v in stats.items()},
+        "saturated_f16": saturated, "saturation_threshold_uv": F16_MAX,
         "ratings": None, "ratings_note": "i .pkl processed non contengono i self-report: da aggiungere dai raw",
     }
     meta_path = out / "meta.json"
