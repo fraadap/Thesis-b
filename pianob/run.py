@@ -52,7 +52,8 @@ def worker_loop(queue_path: str, worker: str, synthetic: bool, device: str) -> N
     bench_path = kaggle_env.state_dir() / "bench" / "bench.json"
     bench = json.loads(bench_path.read_text()) if bench_path.exists() else {}
     failed, skipped_time = set(), set()
-    log(f"avvio: {len(jobs)} job in coda, device={device}, pesi CBraMod={'sì' if wp else 'no'}, "
+    log(f"avvio: codice {kaggle_env.code_version()}, {len(jobs)} job in coda, device={device}, "
+        f"pesi CBraMod={'sì' if wp else 'no'}, "
         f"tempo residuo {guard.remaining_min():.0f} min")
     while True:
         done = done_status()
