@@ -53,6 +53,29 @@ Coda: 63/156 job in 11 h (Optuna circa 6 h per worker). Ultima sessione: TScepti
 
 Mancano: TSception senza EA, EEGNet senza EA (4 seed), ablazione EMG, permutazioni del Δstim per TSception, sonda della clip, valenza binaria con TSception.
 
+## Risultati notebook A, seconda sessione (2026-11-22)
+
+Coda: 178/208 job.
+- **Bug trovato e corretto.** La cache filtrata 4–30 Hz conteneva `inf`: il filtraggio dei campioni già saturati di sub004/023/030 superava il range del float16.
+  - I 5 job "4–30 Hz" sono finiti con loss NaN e sono stati invalidati (`INVALIDATED` in `experiments/queue.py`): si rieseguono e le loro righe vengono scartate.
+  - I 30 job "4–30 Hz + rimozione canali" sono falliti in modo esplicito.
+  - Ora i valori filtrati sono saturati prima del cast; dati o loss non finiti fanno fallire il job.
+- **Allineamento (H2):** TSception +0.084 con EA (p 5e-7); EEGNet +0.098. Senza EA entrambi sono vicini al caso (0.128–0.131).
+- **Scomposizione** (split FM, media sui 3 fold di clip, 23 soggetti):
+
+  | Modello | Totale | Quantità di dati | Δstim^size | Δstim^size corretto | Indice appaiato corretto | Differenza size − appaiato |
+  |---|---|---|---|---|---|---|
+  | TSception + EA | +0.084 | +0.016 (p 0.001) | +0.068 | −0.019 (p 0.016) | −0.025 | +0.006 (n.s.) |
+  | DE + z-score | +0.090 | +0.001 (n.s.) | +0.088 | −0.015 (n.s.) | −0.005 | −0.010 (n.s.) |
+
+  - Circa l'80–100% del calo dipende dalla novità dello stimolo, non dalla quantità di dati.
+  - Il Δstim^size corretto è ≤ 0. Sulle clip T_k viste da altri soggetti, il modello con label vere fa quanto quello con label permutate (TSception 0.197 contro 0.197): il vantaggio di aver visto lo stimolo è interamente memorizzazione dell'identità della clip. Il valore negativo equivale a −(BA_unseen − 1/K), cioè alla piccola generalizzazione genuina sulle clip non viste.
+  - **L'ipotesi pre-registrata H3 ("> 0") non regge: il segno è opposto. Va interpretata così, non riformulata a posteriori.**
+  - Indice appaiato e stima a parità di dati concordano: la diversità degli stimoli in training non conta.
+- **EMG (parziale):** senza canali di bordo −0.001; senza 8 canali casuali −0.008 (cioè leggermente meglio). Manca la parte 4–30 Hz.
+- **Sonda della clip (TSception):** accuratezza sulla clip 0.105 (caso 0.036); la BA della categoria dedotta dalla clip (0.209) è quasi uguale a quella del modello (0.217).
+- **Valenza binaria:** TSception 0.556, DE 0.543 (caso 0.5).
+
 ## Prossimi passi
 
 1. Smoke test su Kaggle con i dati veri. Controllare canali, ampiezze, mappa delle label e pesi.

@@ -89,12 +89,45 @@ def load_queue(path: Path) -> list[Job]:
 
 
 # ------------------------------------------------------------------ stato dei job
+# Job completati con risultati NON validi: i record precedenti a `cutoff` si ignorano (il job viene
+# rieseguito) e le relative righe si scartano nelle analisi.
+INVALIDATED = {
+    **{f"tsception_ea__split_fm__f0__s{s}__emo9__bp4-30": {
+        "cutoff": 1795348800,   # 2026-11-22 12:00 UTC
+        "reason": "cache 4-30 Hz con inf in float16 (campioni saturati filtrati): loss NaN"} for s in range(5)},
+}
+
+
+def is_invalid_record(job_id: str, t) -> bool:
+    inv = INVALIDATED.get(job_id)
+    return inv is not None and (t is None or float(t) < inv["cutoff"])
+
+
+def invalid_row_mask(df):
+    """Righe di risultati prodotte da job invalidati (prima del cutoff), incluse le righe BN-α."""
+    import numpy as np
+    m = np.zeros(len(df), dtype=bool)
+    if df.empty:
+        return m
+    t = df["t"] if "t" in df.columns else None
+    for jid, inv in INVALIDATED.items():
+        config, protocol, fold, seed, task, variant = jid.split("__")
+        sel = (df.config.astype(str).str.startswith(config) & (df.protocol == protocol)
+               & (df.fold == int(fold[1:])) & (df.seed == int(seed[1:])) & (df.task == task)
+               & ((df.variant == variant) | df.variant.astype(str).str.startswith(variant + "_bnalpha")))
+        old = sel if t is None else sel & (t.isna() | (t < inv["cutoff"]))
+        m |= old.values
+    return m
+
+
 def done_status() -> dict[str, dict]:
     out = {}
     for f in (kaggle_env.state_dir() / "done").glob("*.jsonl"):
         for line in f.read_text().splitlines():
             if line.strip():
                 r = json.loads(line)
+                if is_invalid_record(r["job_id"], r.get("t")):
+                    continue
                 prev = out.get(r["job_id"])
                 if prev is None or prev["status"] not in DONE_STATUSES:
                     out[r["job_id"]] = r

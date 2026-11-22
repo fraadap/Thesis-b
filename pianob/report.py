@@ -24,6 +24,10 @@ def load_rows(paths=None) -> pd.DataFrame:
     recs += _tk_rows_from_state(recs)
     df = pd.DataFrame(recs)
     if not df.empty:
+        from .experiments.queue import invalid_row_mask
+        df = df[~invalid_row_mask(df)]
+        if "t" in df.columns:
+            df = df.sort_values("t", na_position="first", kind="stable")
         df = df.drop_duplicates(subset=["config", "protocol", "fold", "seed", "variant", "test_condition",
                                         "task", "subject"], keep="last")
     return df

@@ -203,6 +203,8 @@ def train_model(model: nn.Module, hp: dict, recipe: str, train_bank: TrialBank, 
             scaler.update()
             sched.step()
             losses.append(loss.item())
+        if not np.isfinite(np.mean(losses)):
+            raise FloatingPointError(f"loss non finita all'epoca {epoch}: dati o training numericamente instabili")
         v = validate(model, val_bank, device, use_amp, n_classes)
         score = v[select]
         history.append({"epoch": epoch, "loss": float(np.mean(losses)), **v, "sec": time.time() - t0})

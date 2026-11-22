@@ -17,6 +17,9 @@ from . import faced_meta as FM
 from .. import kaggle_env
 
 
+F16_SAT = 65000.0   # come tools/pack_faced.py: il float16 arriva a ±65504
+
+
 class DatasetAdapter(ABC):
     name: str = "base"
     fs: int = 200
@@ -192,6 +195,9 @@ class FacedAdapter(DatasetAdapter):
             arr = np.asarray(src[np.asarray(subjects)][:, clips], dtype=np.float32)
         if channels is not None:
             arr = arr[:, :, list(channels)]
+        if not np.isfinite(arr).all():
+            bad = sorted({int(subjects[i]) for i in np.where(~np.isfinite(arr).all(axis=(1, 2, 3)))[0]})
+            raise FloatingPointError(f"valori non finiti nei dati (band={band}) per i soggetti {bad}")
         if scale != 1.0:
             arr = arr * np.float32(scale)
         return arr.astype(dtype, copy=False)
@@ -204,7 +210,8 @@ class FacedAdapter(DatasetAdapter):
         from ..prep.filters import bandpass
         cache_dir = self.cache_dir or kaggle_env.cache_dir()
         cache_dir.mkdir(parents=True, exist_ok=True)
-        tag = hashlib.md5(json.dumps([key, self.meta.get("checksum_data")]).encode()).hexdigest()[:8]
+        # "v2": dalla v2 i valori filtrati sono saturati a ±F16_SAT prima del cast (niente inf in float16)
+        tag = hashlib.md5(json.dumps([key, self.meta.get("checksum_data"), "v2"]).encode()).hexdigest()[:8]
         path = cache_dir / f"faced_bp{key[0]:g}-{key[1]:g}_{tag}_f16.npy"
         if not path.exists():
             print(f"[filtri] calcolo band-pass {key} Hz su tutto FACED -> {path.name}")
@@ -213,7 +220,11 @@ class FacedAdapter(DatasetAdapter):
             out = np.lib.format.open_memmap(tmp, mode="w+", dtype=np.float16, shape=self._data.shape)
             for s in range(self._data.shape[0]):
                 if s in set(self.subjects()):
-                    out[s] = bandpass(np.asarray(self._data[s], dtype=np.float32), key, self.fs).astype(np.float16)
+                    y = bandpass(np.asarray(self._data[s], dtype=np.float32), key, self.fs)
+                    n_sat = int((np.abs(y) > F16_SAT).sum())
+                    if n_sat:  # il filtraggio di campioni già saturati (sub004/023/030) supera il range float16
+                        print(f"[filtri] sub{s:03d}: {n_sat} campioni filtrati oltre ±{F16_SAT:.0f} -> saturati")
+                    out[s] = np.clip(y, -F16_SAT, F16_SAT).astype(np.float16)
                 else:
                     out[s] = np.nan
             out.flush()

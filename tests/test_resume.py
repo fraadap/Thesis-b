@@ -64,3 +64,38 @@ def test_restore_state_from_previous_output(tmp_path, monkeypatch):
     assert set((st / "results" / "rows_w0.jsonl").read_text().split()) == {'{"a":', '1}', '{"b":', '2}'}
     from pianob.experiments.queue import done_status
     assert done_status()["x"]["status"] == "completed"
+
+
+def test_nan_data_fails_loudly(tmp_path):
+    import pytest
+    hp = {"epochs": 2, "batch_size": 8, "lr": 1e-3, "weight_decay": 0.0, "label_smoothing": 0.0,
+          "class_weighted": True, "clip_grad": 1.0, "patience": 0, "select_metric": "ba_subject_mean",
+          "scheduler": "cosine_step", "amp": False}
+    rng = np.random.default_rng(0)
+    data = rng.standard_normal((12, 4, 800)).astype(np.float32)
+    data[3, 1, 100] = np.inf
+    s, c, lab = np.repeat([0, 1, 2], 4), np.tile(np.arange(4), 3), np.arange(12) % 2
+    tr = TrialBank(data, s, c, lab, 200)
+    with pytest.raises(FloatingPointError):
+        train_model(EEGNet(4, 200, 2, fs=100), hp, "default", tr, tr, 2, "cpu", seed=0, log=lambda x: None)
+
+
+def test_invalidated_jobs_rerun_and_rows_dropped(tmp_path, monkeypatch):
+    import pandas as pd
+    from pianob.experiments import queue as Q
+    monkeypatch.setenv("PIANOB_WORKING", str(tmp_path))
+    jid = "tsception_ea__split_fm__f0__s0__emo9__bp4-30"
+    cut = Q.INVALIDATED[jid]["cutoff"]
+    d = kaggle_env.state_dir() / "done" / "done_w0.jsonl"
+    d.write_text(json.dumps({"job_id": jid, "status": "early_stopped", "t": cut - 100}) + "\n")
+    assert jid not in Q.done_status()                       # record vecchio ignorato -> si riesegue
+    with open(d, "a") as fh:
+        fh.write(json.dumps({"job_id": jid, "status": "completed", "t": cut + 100}) + "\n")
+    assert Q.done_status()[jid]["status"] == "completed"    # la nuova esecuzione conta
+    base = dict(protocol="split_fm", fold=0, seed=0, task="emo9", subject=100, ba_win=0.1)
+    df = pd.DataFrame([{**base, "config": "tsception_ea", "variant": "bp4-30"},
+                       {**base, "config": "tsception_ea_bnalpha", "variant": "bp4-30_bnalpha_session_n00"},
+                       {**base, "config": "tsception_ea", "variant": "bp4-30", "t": cut + 5},
+                       {**base, "config": "tsception_ea", "variant": "bp4-30_noedge"},
+                       {**base, "config": "tsception_ea", "variant": "base"}])
+    assert Q.invalid_row_mask(df).tolist() == [True, True, False, False, False]

@@ -132,7 +132,7 @@ def result_rows(job: Job, config_name: str, ev: dict, cond: str, variant: str, e
         rows.append({"config": config_name, "protocol": job.protocol, "fold": job.fold, "seed": job.seed,
                      "variant": variant, "test_condition": cond, "task": job.task, "subject": s,
                      **{k: (None if isinstance(v, float) and np.isnan(v) else round(v, 5) if isinstance(v, float) else v)
-                        for k, v in m.items()}, **extra})
+                        for k, v in m.items()}, **extra, "t": round(time.time())})
     return rows
 
 

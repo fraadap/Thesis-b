@@ -83,6 +83,10 @@ def load_inputs(paths) -> tuple[pd.DataFrame, list[dict], list[dict]]:
             rows += _compact_to_rows(cj)
     df = pd.DataFrame(rows + pred_rows)   # le righe salvate dai job hanno la precedenza (keep="first" sotto)
     if not df.empty:
+        from pianob.experiments.queue import invalid_row_mask
+        df = df[~invalid_row_mask(df)]
+        if "t" in df.columns:   # a parità di chiave vince la riga più recente
+            df = df.iloc[::-1].sort_values("t", ascending=False, na_position="last", kind="stable")
         df = df.drop_duplicates(keep="first", subset=["config", "protocol", "fold", "seed", "variant",
                                                       "test_condition", "task", "subject"])
         df = df.drop_duplicates(subset=["config", "protocol", "fold", "seed", "variant", "test_condition", "task",
