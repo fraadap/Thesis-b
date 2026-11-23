@@ -82,6 +82,22 @@ Coda: 178/208 job; **completata (208/208) con la ripresa del 2026-11-23**.
 - **Sonda della clip (TSception):** accuratezza sulla clip 0.105 (caso 0.036); la BA della categoria dedotta dalla clip (0.209) è quasi uguale a quella del modello (0.217).
 - **Valenza binaria:** TSception 0.556, DE 0.543 (caso 0.5).
 
+## Valenza binaria su stimoli nuovi (notebook A, 2026-11-24)
+
+58 job, nessun fallimento. Caso = 0.5; 23 soggetti di test.
+
+| | Clip condivise | LCO viste | LCO non viste (finestra / trial) | A parità di dati, su T_k |
+|---|---|---|---|---|
+| TSception + EA (3 seed) | 0.556 (p 2e-4) | 0.586 | **0.515 (p 0.27) / 0.499** | 0.567 |
+| DE + asimmetrie | 0.543 (p 0.007) | 0.553 | **0.509 (p 0.60) / 0.511** | 0.542 |
+
+- **Su clip non viste la valenza binaria è al caso** per entrambi i modelli. Per TSception per fold di clip: 0.543 / 0.480 / 0.521. Solo il fold 0 è sopra il caso nel test di permutazione.
+- Scomposizione:
+  - TSception: totale +0.041 (p 0.004) = quantità di dati −0.011 (n.s.) + Δstim^size +0.052 (p 5e-4); Δstim^size corretto +0.022 (n.s.); indice appaiato corretto +0.008 (n.s.).
+  - DE: totale +0.034 = dati +0.001 + Δstim^size +0.033; corretto −0.011 (n.s.).
+- Memorizzazione della clip (permutate viste − caso): TSception 0.063, DE 0.053. Spiega il vantaggio sopra il caso sulle clip condivise.
+- **Conclusione:** anche per la valenza binaria il risultato "sopra il caso" con clip condivise è memorizzazione dello stimolo; sulle clip nuove non c'è segnale rilevabile con 23 soggetti.
+
 ## Risultati notebook B (2026-11-23)
 
 - **Gate 1 passato** con AMP fp16 sulle T4: BA media per soggetto 0.558 (trial 0.751).
@@ -100,7 +116,7 @@ Legenda: [x] fatto · [ ] da fare · (opz.) facoltativo.
 
 **Account 1 (notebook A, TSception ed EEGNet)**
 - [x] Baseline su feature, Optuna TSception ed EEGNet, TSception ed EEGNet su split FM e leave-clip-out, BN-α, ablazioni senza EA, ablazione EMG, permutazioni Δstim, sonda della clip, controllo della quantità di dati (9 classi), valenza su split FM. 208 job.
-- [ ] **Valenza binaria su stimoli nuovi** (58 job aggiunti alla stessa coda, circa 3–3.5 h di sessione):
+- [x] **Valenza binaria su stimoli nuovi** (58 job, completati il 2026-11-24):
   - TSception su leave-clip-out (3 seed) e a parità di dati (3 seed × 2 estrazioni);
   - permutazioni per entrambe le correzioni;
   - DE su leave-clip-out e a parità di dati, più la rivalutazione su T_k.
