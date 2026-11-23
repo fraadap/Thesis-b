@@ -55,7 +55,7 @@ Mancano: TSception senza EA, EEGNet senza EA (4 seed), ablazione EMG, permutazio
 
 ## Risultati notebook A, seconda sessione (2026-11-22)
 
-Coda: 178/208 job.
+Coda: 178/208 job; **completata (208/208) con la ripresa del 2026-11-23**.
 - **Bug trovato e corretto.** La cache filtrata 4–30 Hz conteneva `inf`: il filtraggio dei campioni già saturati di sub004/023/030 superava il range del float16.
   - I 5 job "4–30 Hz" sono finiti con loss NaN e sono stati invalidati (`INVALIDATED` in `experiments/queue.py`): si rieseguono e le loro righe vengono scartate.
   - I 30 job "4–30 Hz + rimozione canali" sono falliti in modo esplicito.
@@ -72,7 +72,13 @@ Coda: 178/208 job.
   - Il Δstim^size corretto è ≤ 0. Sulle clip T_k viste da altri soggetti, il modello con label vere fa quanto quello con label permutate (TSception 0.197 contro 0.197): il vantaggio di aver visto lo stimolo è interamente memorizzazione dell'identità della clip. Il valore negativo equivale a −(BA_unseen − 1/K), cioè alla piccola generalizzazione genuina sulle clip non viste.
   - **L'ipotesi pre-registrata H3 ("> 0") non regge: il segno è opposto. Va interpretata così, non riformulata a posteriori.**
   - Indice appaiato e stima a parità di dati concordano: la diversità degli stimoli in training non conta.
-- **EMG (parziale):** senza canali di bordo −0.001; senza 8 canali casuali −0.008 (cioè leggermente meglio). Manca la parte 4–30 Hz.
+- **EMG (completo dopo la ripresa del 2026-11-23, TSception + EA, 5 seed):** BA piena 0.212.
+  - 4–30 Hz: 0.211;
+  - 4–30 Hz senza canali di bordo: 0.210 (ΔEMG = +0.003);
+  - 4–30 Hz senza 8 canali casuali: 0.214 (controllo −0.002);
+  - H4 non significativa (+0.004, p 0.27).
+
+  Per classe: con 4–30 Hz e senza bordo il recall di amusement scende da 0.32 a 0.27, quello di disgust sale da 0.29 a 0.37. Nessuna dipendenza globale dall'EMG per TSception; resta da verificare su CBraMod.
 - **Sonda della clip (TSception):** accuratezza sulla clip 0.105 (caso 0.036); la BA della categoria dedotta dalla clip (0.209) è quasi uguale a quella del modello (0.217).
 - **Valenza binaria:** TSception 0.556, DE 0.543 (caso 0.5).
 
