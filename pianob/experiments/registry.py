@@ -47,6 +47,15 @@ def _all() -> dict[str, ExpConfig]:
           hparams=dict(_CBRAMOD_OFFICIAL), notes="Gate 1: ricetta ufficiale, full fine-tuning"),
         C("cbramod_scratch_ft", "neural", "cbramod", window_s=10, pretrained=False, recipe="cbramod_official",
           hparams=dict(_CBRAMOD_OFFICIAL), notes="init casuale, stessa ricetta (cfr. issue #22 del repo)"),
+        # Diagnostica dell'init casuale (la ricetta esatta collassa sulla classe più frequente, cfr. issue #22):
+        # una sola modifica alla volta rispetto a cbramod_scratch_ft.
+        C("cbramod_scratch_ft_definit", "neural", "cbramod", window_s=10, pretrained=False, recipe="cbramod_official",
+          hparams={**_CBRAMOD_OFFICIAL, "init": "default"}, notes="init casuale di default PyTorch"),
+        C("cbramod_scratch_ft_warmup", "neural", "cbramod", window_s=10, pretrained=False, recipe="cbramod_official",
+          hparams={**_CBRAMOD_OFFICIAL, "lr_warmup_epochs": 3}, notes="warm-up lineare delle LR per 3 epoche"),
+        C("cbramod_scratch_ft_definit_warmup", "neural", "cbramod", window_s=10, pretrained=False,
+          recipe="cbramod_official", hparams={**_CBRAMOD_OFFICIAL, "init": "default", "lr_warmup_epochs": 3},
+          notes="entrambe le modifiche"),
         C("cbramod_lora_r2", "neural", "cbramod", window_s=10, pretrained=True, hparams=dict(_LORA),
           hpo_study="cbramod_lora_r2"),
         C("cbramod_lora_r2_ea", "neural", "cbramod", window_s=10, pretrained=True, align="ea",

@@ -1,0 +1,18 @@
+{
+ "study": "cbramod_lora_r2",
+ "params": {
+  "lr_head": 0.0008154651085285596,
+  "lr_lora": 0.0003078166541139131,
+  "lora_rank": 4,
+  "lora_dropout": 0.2708281123104386,
+  "weight_decay": 0.0034313566209118397,
+  "label_smoothing": 0.2,
+  "warmup_head_epochs": 3,
+  "head": "all_patch_reps"
+ },
+ "value": 0.600462962962963,
+ "trial": 21,
+ "n_complete": 13,
+ "n_pruned": 18,
+ "best_epoch": 32
+}

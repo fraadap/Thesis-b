@@ -19,6 +19,12 @@ def build_model(cfg, n_channels: int, n_samples: int, n_classes: int, fs: int = 
                                   dropout=cfg.hp("dropout", 0.1),
                                   pretrained_path=pretrained_path if cfg.pretrained else None,
                                   n_layer=cfg.hp("n_layer", 12))
+        if not cfg.pretrained and cfg.hp("init", "official") == "default":
+            # variante diagnostica: init di default di PyTorch al posto di kaiming_normal(fan_out) del codice
+            # ufficiale, che con la ricetta ufficiale fa divergere/collassare il training da zero
+            for mod in model.backbone.modules():
+                if isinstance(mod, nn.Linear):
+                    mod.reset_parameters()
         if cfg.hp("lora_rank", 0):
             from .lora import apply_lora, mark_trainable_lora
             apply_lora(model, rank=cfg.hp("lora_rank"), alpha=cfg.hp("lora_alpha", None),

@@ -82,6 +82,18 @@ Coda: 178/208 job; **completata (208/208) con la ripresa del 2026-11-23**.
 - **Sonda della clip (TSception):** accuratezza sulla clip 0.105 (caso 0.036); la BA della categoria dedotta dalla clip (0.209) è quasi uguale a quella del modello (0.217).
 - **Valenza binaria:** TSception 0.556, DE 0.543 (caso 0.5).
 
+## Risultati notebook B (2026-11-23)
+
+- **Gate 1 passato** con AMP fp16 sulle T4: BA media per soggetto 0.558 (trial 0.751).
+  - Rispetto a TSception+EA: +0.346 (p 2e-7, nessun soggetto peggiora).
+  - BA su T_k (clip condivise): 0.536 / 0.523 / 0.607.
+- **Init casuale con la ricetta esatta: collassa** in tutti e 3 i seed, predicendo sempre "neutral" (BA 0.111).
+  - Nella prima epoca la loss media è 10–17 (il caso è ln 9 ≈ 2.2), poi si assesta su 2.2: il training diverge e la rete diventa costante.
+  - Su CPU: con l'init kaiming(fan_out) del codice ufficiale le feature del backbone hanno deviazione standard circa 5, contro 1.5 con l'init di default di PyTorch; i logit iniziali sono piccoli in entrambi i casi.
+  - Coerente con la issue #22 del repo.
+  - **H1 contro questo controllo sarebbe banale**: serve un "da zero" che impari. Diagnostica in coda sul notebook B (1 seed per variante, una modifica alla volta): init di default; warm-up lineare delle LR per 3 epoche; entrambe. La variante che impara si porta a 3 seed per H1. Si riportano sia la ricetta esatta (collasso) sia la variante, dichiarando la deviazione.
+- **Optuna CBraMod con LoRA completato:** 13 trial completi + 18 potati. Migliore BA di validation 0.600 con rango 4, lr testa 8.2e-4, lr LoRA 3.1e-4, dropout LoRA 0.27, label smoothing 0.2, warm-up della testa 3 epoche, testa ufficiale. Salvato in `pianob/hpo/best/cbramod_lora_r2.json`: il notebook C lo trova senza collegare l'output del notebook B.
+
 ## Checklist delle run (aggiornata il 2026-11-23)
 
 Legenda: [x] fatto · [ ] da fare · (opz.) facoltativo.
@@ -94,12 +106,13 @@ Legenda: [x] fatto · [ ] da fare · (opz.) facoltativo.
   - DE su leave-clip-out e a parità di dati, più la rivalutazione su T_k.
 
 **Account 2 (notebook B, CBraMod)**
-- [ ] Gate 1: ricetta ufficiale su split FM, 3 seed.
-- [ ] Init casuale, stessa ricetta, 3 seed (ipotesi primaria H1).
-- [ ] Optuna CBraMod con LoRA, 30 trial: probabilmente 2 sessioni.
+- [x] Gate 1: ricetta ufficiale su split FM, 3 seed → **passato** (0.558).
+- [x] Init casuale, stessa ricetta, 3 seed → collasso (vedi sopra).
+- [x] Optuna CBraMod con LoRA, 30 trial (31 finiti in una sessione).
+- [ ] **Diagnostica dell'init casuale** (3 job, circa 1 h), poi 3 seed della variante che impara (H1).
 - (opz.) Optuna sulla ricetta ufficiale (lr e `multi_lr`, 10 trial) se il Gate 1 non passa per poco.
 
-**Account 3 (notebook C, solo dopo Gate 1 e Optuna LoRA)**, 88 job, circa 2–3 sessioni:
+**Account 3 (notebook C)**, 88 job, circa 2–3 sessioni. **Può partire ora**: Gate 1 passato, iperparametri LoRA nel codice.
 - [ ] LoRA su split FM (3 seed) e leave-clip-out (5 seed); ricetta ufficiale su leave-clip-out (5 seed).
 - [ ] LoRA con EA (split FM e leave-clip-out, 3 seed); LoRA con z-score (3 seed).
 - [ ] Controllo della quantità di dati con CBraMod (3 seed + 2 permutati) **prima** dell'ablazione EMG.
@@ -137,7 +150,7 @@ Legenda: [x] fatto · [ ] da fare · (opz.) facoltativo.
 
 | Gate | Criterio | Esito |
 |---|---|---|
-| Gate 1, riproduzione | `cbramod_ft_official` su `split_fm`, 3 seed, BA pooled a livello di finestra entro circa 2 punti da 0.5509 | da eseguire |
+| Gate 1, riproduzione | `cbramod_ft_official` su `split_fm`, 3 seed, BA pooled a livello di finestra entro circa 2 punti da 0.5509 | **PASSATO (2026-11-23)**: BA pooled 0.5579 (seed 0.5613 / 0.5546 / 0.5578), κ 0.500, F1w 0.563 (paper 0.5509 / 0.5041 / 0.5618) |
 | Gate 2, pipeline | tutte le config (tranne REVE) su `split_fm` e `split_fm_lco`, con tabelle e indici | da eseguire |
 | Gate di potenza | dopo `lnso10` per 2 config: effetto minimo rilevabile ≤ 2 punti? | da eseguire |
 

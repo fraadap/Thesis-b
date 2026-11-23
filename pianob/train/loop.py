@@ -101,7 +101,14 @@ def build_optimizer(model, hp: dict, recipe: str, steps_per_epoch: int):
     groups = [g for g in groups if g["params"]]
     opt = torch.optim.AdamW(groups, weight_decay=wd)
     total = max(1, hp["epochs"] * steps_per_epoch)
-    if hp.get("scheduler", "cosine_step") == "cosine_step":
+    warm = int(round(float(hp.get("lr_warmup_epochs", 0)) * steps_per_epoch))
+    if hp.get("scheduler", "cosine_step") == "cosine_step" and warm > 0:
+        # warm-up lineare delle LR (variante diagnostica per CBraMod da zero), poi coseno come la ricetta
+        sched = torch.optim.lr_scheduler.SequentialLR(opt, [
+            torch.optim.lr_scheduler.LinearLR(opt, start_factor=0.01, end_factor=1.0, total_iters=warm),
+            torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, total - warm), eta_min=1e-6)],
+            milestones=[warm])
+    elif hp.get("scheduler", "cosine_step") == "cosine_step":
         sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=total, eta_min=1e-6)
     else:
         sched = torch.optim.lr_scheduler.LambdaLR(opt, lambda s: 1.0)

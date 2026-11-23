@@ -269,6 +269,9 @@ def queue_nbB() -> list[Job]:
     J = train_jobs("cbramod_ft_official", ["split_fm"], CBRAMOD_SEEDS3)
     J += train_jobs("cbramod_scratch_ft", ["split_fm"], CBRAMOD_SEEDS3)
     J += hpo_jobs("cbramod_lora_r2", 30)
+    # Diagnostica dell'init casuale (aggiunta 2026-11-24): 1 seed per variante, poi 3 seed per quella che impara
+    J += [Job("train", c, "split_fm", 0, 3407) for c in
+          ("cbramod_scratch_ft_definit", "cbramod_scratch_ft_warmup", "cbramod_scratch_ft_definit_warmup")]
     return J
 
 
