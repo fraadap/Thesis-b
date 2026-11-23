@@ -22,7 +22,10 @@ def print_env() -> dict:
         print(f"  {k}: {v}")
     print(f"  versione codice: {kaggle_env.code_version()}")
     if info["kaggle"] and not info["gpus"]:
+        print("  " + "!" * 70)
         print("  ATTENZIONE: nessuna GPU. Settings -> Accelerator -> GPU T4 x2.")
+        print("  Solo lo smoke test gira su CPU: le altre code si fermeranno subito.")
+        print("  " + "!" * 70)
     elif info["gpus"] and "P100" in info["gpus"][0]["name"]:
         print("  Nota: P100 (più lenta della T4 in fp16, niente tensor core). Funziona comunque.")
     return info

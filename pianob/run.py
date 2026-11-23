@@ -26,6 +26,16 @@ def _n_gpus() -> int:
         return 0
 
 
+def _needs_gpu(job) -> bool:
+    """Job che su CPU non sono praticabili: modelli neurali e studi Optuna (esclusi gli smoke test)."""
+    if job.overrides.get("max_subjects"):
+        return False
+    if job.kind == "hpo":
+        return True
+    from .experiments.registry import get_config
+    return get_config(job.config).family == "neural"
+
+
 def worker_loop(queue_path: str, worker: str, synthetic: bool, device: str) -> None:
     from .bench import empirical_minutes, estimate_job
     from .data.adapters import FacedAdapter
@@ -132,6 +142,17 @@ def main(argv=None):
     from .hpo.optuna_runner import fail_stale_trials
     fail_stale_trials()
     gpus = list(range(_n_gpus())) if a.gpus == "auto" else ([] if a.gpus == "none" else [int(g) for g in a.gpus.split(",")])
+    if not gpus and kaggle_env.on_kaggle() and not synthetic and os.environ.get("PIANOB_ALLOW_CPU") != "1":
+        from .experiments.queue import load_queue
+        need = [j.job_id for j in load_queue(a.queue) if _needs_gpu(j)]
+        if need:
+            print("\n" + "!" * 80 + "\nERRORE: nessuna GPU in questa sessione, ma la coda contiene "
+                  f"{len(need)} job che la richiedono (es. {need[0]}).\n"
+                  "Su CPU un solo job può richiedere più delle 12 h della sessione: mi fermo subito.\n"
+                  "Rimedio: Settings -> Accelerator -> GPU T4 x2, poi Save Version -> Save & Run All.\n"
+                  "(Se la quota GPU settimanale è esaurita, Kaggle non assegna la GPU: controlla Settings -> Quotas.)\n"
+                  + "!" * 80, flush=True)
+            sys.exit(2)
     if not a.skip_bench:
         from .bench import print_estimates, run_bench
         from .experiments.queue import load_queue
