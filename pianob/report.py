@@ -149,16 +149,19 @@ def shortcut_summary(df: pd.DataFrame) -> dict:
     out = {"stim": {}, "emg": {}, "decomposition": {}}
     if df.empty:
         return out
+    tasks = sorted(df.task.unique()) if "task" in df.columns else ["emo9"]
     for c in sorted(df.config.unique()):
-        for p in ("split_fm_lco", "lnso10_lco"):
-            d = delta_stim(df, c, p)
-            if d:
-                out["stim"][f"{c}|{p}"] = {k: (np.round(v, 3).tolist() if isinstance(v, list) and k != "subjects" else v)
-                                           for k, v in d.items()}
-        for bp in ("split_fm", "lnso10"):
-            dec = stim_decomposition(df, c, bp)
-            if dec:
-                out["decomposition"][f"{c}|{bp}"] = dec
+        for t in tasks:
+            sfx = "" if t == "emo9" else f"|{t}"
+            for p in ("split_fm_lco", "lnso10_lco"):
+                d = delta_stim(df, c, p, task=t)
+                if d:
+                    out["stim"][f"{c}|{p}{sfx}"] = {k: (np.round(v, 3).tolist() if isinstance(v, list) and k != "subjects"
+                                                        else v) for k, v in d.items()}
+            for bp in ("split_fm", "lnso10"):
+                dec = stim_decomposition(df, c, bp, task=t)
+                if dec:
+                    out["decomposition"][f"{c}|{bp}{sfx}"] = dec
         e = delta_emg(df, c)
         if e and len(e) > 2:
             out["emg"][c] = {k: (np.round(v, 3).tolist() if isinstance(v, list) and k != "subjects" else v)

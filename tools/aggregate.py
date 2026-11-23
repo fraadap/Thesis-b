@@ -223,21 +223,23 @@ def main():
                   f"IC95 {np.round(v.get('ci95', [np.nan, np.nan]), 4).tolist()}, peggiorati {v.get('frac_worse', np.nan):.2f}, "
                   f"p {v.get('p', np.nan):.4g} ({v.get('test')}), p Holm {v.get('p_holm', np.nan):.4g}, n {v['n']}")
     md.append("\n## Indici di scorciatoia\n")
+    tasks = sorted(df.task.unique())
+    for c, p, t in [(c, p, t) for c in sorted(df.config.unique()) for t in tasks for p in ("split_fm_lco", "lnso10_lco")]:
+        d = delta_stim(df, c, p, task=t)
+        if d:
+            md.append(f"- Δstim {c} [{p}, {t}]: viste {d['seen_mean']:.3f}, non viste {d['unseen_mean']:.3f}, grezzo {d['raw_mean']:.4f}" +
+                      (f"; permutate viste {d['seen_perm_mean']:.3f} / non viste {d['unseen_perm_mean']:.3f}; "
+                       f"memorizzazione {d['memorization_mean']:.4f}; corretto (vs caso) {d['corr_chance_mean']:.4f}; "
+                       f"corretto (prompt) {d['corr_mean']:.4f}" if "corr_mean" in d else ""))
     for c in sorted(df.config.unique()):
-        for p in ("split_fm_lco", "lnso10_lco"):
-            d = delta_stim(df, c, p)
-            if d:
-                md.append(f"- Δstim {c} [{p}]: viste {d['seen_mean']:.3f}, non viste {d['unseen_mean']:.3f}, grezzo {d['raw_mean']:.4f}" +
-                          (f"; permutate viste {d['seen_perm_mean']:.3f} / non viste {d['unseen_perm_mean']:.3f}; "
-                           f"memorizzazione {d['memorization_mean']:.4f}; corretto (vs caso) {d['corr_chance_mean']:.4f}; "
-                           f"corretto (prompt) {d['corr_mean']:.4f}" if "corr_mean" in d else ""))
         e = delta_emg(df, c)
         if e and len(e) > 2:
             md.append(f"- ΔEMG {c}: " + ", ".join(f"{k[6:]} {e[k]:.4f}" for k in e if k.startswith("delta_")))
     md.append("\n## Quantità di dati contro novità dello stimolo\n")
     for c in sorted(df.config.unique()):
-        for bp in ("split_fm", "lnso10"):
-            md += decomposition_lines(stim_decomposition(df, c, bp), f"{c} [{bp}]")
+        for t in tasks:
+            for bp in ("split_fm", "lnso10"):
+                md += decomposition_lines(stim_decomposition(df, c, bp, task=t), f"{c} [{bp}, {t}]")
     md.append("\n## Confronti esplorativi (non corretti)\n")
     for k, v in exploratory(df).items():
         md.append(f"- {k}: diff {v['mean_diff']:.4f}, dz {v.get('dz', np.nan):.2f}, p {v.get('p', np.nan):.4g} ({v.get('test')}), n {v['n']}")

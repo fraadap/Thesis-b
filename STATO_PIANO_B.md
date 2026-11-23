@@ -82,6 +82,43 @@ Coda: 178/208 job; **completata (208/208) con la ripresa del 2026-11-23**.
 - **Sonda della clip (TSception):** accuratezza sulla clip 0.105 (caso 0.036); la BA della categoria dedotta dalla clip (0.209) è quasi uguale a quella del modello (0.217).
 - **Valenza binaria:** TSception 0.556, DE 0.543 (caso 0.5).
 
+## Checklist delle run (aggiornata il 2026-11-23)
+
+Legenda: [x] fatto · [ ] da fare · (opz.) facoltativo.
+
+**Account 1 (notebook A, TSception ed EEGNet)**
+- [x] Baseline su feature, Optuna TSception ed EEGNet, TSception ed EEGNet su split FM e leave-clip-out, BN-α, ablazioni senza EA, ablazione EMG, permutazioni Δstim, sonda della clip, controllo della quantità di dati (9 classi), valenza su split FM. 208 job.
+- [ ] **Valenza binaria su stimoli nuovi** (58 job aggiunti alla stessa coda, circa 3–3.5 h di sessione):
+  - TSception su leave-clip-out (3 seed) e a parità di dati (3 seed × 2 estrazioni);
+  - permutazioni per entrambe le correzioni;
+  - DE su leave-clip-out e a parità di dati, più la rivalutazione su T_k.
+
+**Account 2 (notebook B, CBraMod)**
+- [ ] Gate 1: ricetta ufficiale su split FM, 3 seed.
+- [ ] Init casuale, stessa ricetta, 3 seed (ipotesi primaria H1).
+- [ ] Optuna CBraMod con LoRA, 30 trial: probabilmente 2 sessioni.
+- (opz.) Optuna sulla ricetta ufficiale (lr e `multi_lr`, 10 trial) se il Gate 1 non passa per poco.
+
+**Account 3 (notebook C, solo dopo Gate 1 e Optuna LoRA)**, 88 job, circa 2–3 sessioni:
+- [ ] LoRA su split FM (3 seed) e leave-clip-out (5 seed); ricetta ufficiale su leave-clip-out (5 seed).
+- [ ] LoRA con EA (split FM e leave-clip-out, 3 seed); LoRA con z-score (3 seed).
+- [ ] Controllo della quantità di dati con CBraMod (3 seed + 2 permutati) **prima** dell'ablazione EMG.
+- [ ] Ablazione EMG con CBraMod (3 seed, 3 estrazioni di controllo); sonda della clip; permutazioni Δstim (2).
+
+**A rotazione (notebook D, 10 fold sui soggetti)**, dopo la scelta delle config finali:
+- [ ] Config finali su `lnso10` (3 seed) e `lnso10_lco` (TSception 3 seed, CBraMod 1 seed, DE 1).
+- [ ] `lnso10_sizematched` per le 2 config finali (1 seed × 1 estrazione).
+- [ ] Gate di potenza dopo le prime 2 config.
+- (opz.) Anticipare la parte TSception e DE sull'account 1 con una coda dedicata (non dipende da CBraMod).
+
+**Facoltativi / condizionati**
+- (opz.) EEGNet nel controllo della quantità di dati (circa 3 GPU-h).
+- (opz.) EEGNet con la ricetta CBraMod (finestre da 10 s, niente EA, 50 epoche, selezione sul kappa), per il confronto con lo 0.409 riportato da CBraMod. Ha senso se il Gate 1 passa.
+- (opz.) Variante di sensibilità con clipping robusto delle ampiezze (sub003/004/023/030/056/064/120).
+- (opz.) Tuning annidato per fold di TSception (15 trial per fold esterno).
+- (opz.) Arousal binario: servono i self-report dai dati grezzi (file da individuare su Synapse).
+- Fuori perimetro per ora: altri dataset, REVE, Proposte 2–3 e preprocessing dai raw (sessioni successive).
+
 ## Prossimi passi
 
 1. Smoke test su Kaggle con i dati veri. Controllare canali, ampiezze, mappa delle label e pesi.

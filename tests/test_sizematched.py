@@ -134,3 +134,14 @@ def test_music_hook():
         p = stimulus_holdout_plan(list(range(20)), list(range(n)), folds[0])
         assert all(len(v) == n - h for v in p["per_subject"].values())
         assert set(folds[0]) <= set().union(*p["per_subject"].values())
+
+
+def test_val2_sizematched_and_lco_consistent():
+    ad = FacedAdapter(synthetic=True).load()
+    clips = ad.task_clips("val2")
+    for k in range(3):
+        sp = make_split("split_fm_sizematched", k, clips)
+        lco = make_split("split_fm_lco", k, clips)
+        assert not set(sp.heldout_clips) & {12, 13, 14, 15} and sp.heldout_clips == lco.unseen_clips
+        assert sp.n_train_trials() == lco.n_train_trials()
+        assert all(not set(v) & {12, 13, 14, 15} for v in sp.train_clips_per_subject.values())

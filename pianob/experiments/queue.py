@@ -200,8 +200,8 @@ def emg_jobs(config, seeds, n_draws=5, protocol="split_fm", one_seed_per_draw=Fa
     return jobs
 
 
-def perm_jobs(config, protocol, perms, seed=0, deps=()) -> list[Job]:
-    return [Job("train", config, protocol, f, seed, perm=k, depends_on=list(deps))
+def perm_jobs(config, protocol, perms, seed=0, deps=(), task="emo9") -> list[Job]:
+    return [Job("train", config, protocol, f, seed, task, perm=k, depends_on=list(deps))
             for k in perms for f in _folds(protocol)]
 
 
@@ -250,6 +250,17 @@ def queue_nbA() -> list[Job]:
     J += train_jobs("tsception_ea", ["split_fm"], SEEDS3, task="val2", depends_on=dt)
     J += [Job("train", c, p, f, 0, task="val2") for c in ("const_majority", "de_asym_lr")
           for p in ("split_fm",) for f in _folds(p)]
+    # Valenza binaria su stimoli nuovi (aggiunta 2026-11-23): leave-clip-out + controllo della quantità di
+    # dati, con permutazioni per entrambe le correzioni. BA_full su T_k: TSception dalle predizioni salvate
+    # dei job val2 su split_fm; DE con un job di rivalutazione 'tkeval'.
+    J += train_jobs("tsception_ea", ["split_fm_lco"], SEEDS3, task="val2", depends_on=dt)
+    J += perm_jobs("tsception_ea", "split_fm_lco", perms=range(3), deps=dt, task="val2")
+    J += sizematched_jobs("tsception_ea", SEEDS3, draws=[0, 1], n_perm_models=3, deps=dt, task="val2")
+    J += [Job("train", "const_majority", "split_fm_lco", f, 0, task="val2") for f in _folds("split_fm_lco")]
+    J += [Job("train", "de_asym_lr", "split_fm_lco", f, 0, task="val2", n_perm=100) for f in _folds("split_fm_lco")]
+    J += [Job("train", "de_asym_lr", "split_fm_sizematched", f, 0, task="val2", draw=d, n_perm=50)
+          for d in (0, 1) for f in _folds("split_fm_sizematched")]
+    J += [Job("train", "de_asym_lr", "split_fm", 0, 0, task="val2", overrides={"tag": "tkeval"})]
     return J
 
 
