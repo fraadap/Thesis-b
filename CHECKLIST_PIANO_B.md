@@ -23,7 +23,7 @@ Aggiornata il 2026-11-24, dopo il notebook C. Fonte dei numeri: `tools/aggregate
 | Gate | Criterio previsto | Ottenuto | Stato |
 |---|---|---|---|
 | Gate 1: riproduzione CBraMod | BA pooled entro circa 2 punti da 0.5509 (3 seed) | **0.5579** (0.561 / 0.555 / 0.558); κ 0.500 (paper 0.504); F1w 0.563 (paper 0.562) | ✅ passato |
-| Gate 2: pipeline completa su split FM + leave-clip-out | Tutte le config tranne REVE, con tabelle e indici | Tutte eseguite; CBraMod con EA / z-score da ripetere (bug di scala) | 🔀 quasi completo (⏳ 15 job) |
+| Gate 2: pipeline completa su split FM + leave-clip-out | Tutte le config tranne REVE, con tabelle e indici | Tutte eseguite; CBraMod con EA / z-score ripetuto con la scala robusta | ✅ completo |
 | Gate di potenza | Dopo `lnso10` per 2 config: effetto minimo rilevabile ≤ 2 punti | Stima preliminare su 23 soggetti: 1.1–3.7 punti; proiezione su 123: 0.5–1.5 punti | ⏳ notebook D |
 
 ---
@@ -92,7 +92,7 @@ Deviazione 🔀: la scelta della testa (ufficiale contro leggera) è stata aggiu
 | Sessione dell'account 2 senza GPU (11 h perse) | — | 🆕 La coda si ferma subito se manca la GPU | Risolto |
 | Zip del codice non aggiornato (run inutile) | — | 🆕 Versione del codice nella riga di avvio del log | Risolto |
 | Stime dei tempi 2–3 volte troppo alte | Micro-benchmark | 🔀 Stime dai minuti effettivi dei job già completati | Risolto |
-| CBraMod con EA / z-score fermo al caso (13/15 job) | — | 🆕 Riscalatura resa robusta (prima era dominata dagli artefatti di sub003/004); job invalidati | ⛔ → ⏳ ripetizione |
+| CBraMod con EA / z-score fermo al caso (13/15 job) | — | 🆕 Riscalatura resa robusta (prima era dominata dagli artefatti di sub003/004); job invalidati e ripetuti | ✅ ora impara; EA −16.0, z-score −1.7 |
 | CBraMod perde 37.6 punti a 4–30 Hz in modo uniforme su tutte le classi | Ablazione EMG = 4–30 Hz + bordo | 🆕 Scomposizione: solo passa-alto 4 Hz, solo passa-basso 30 Hz, bordo frontale contro temporale | ⏳ |
 | Il primo blocco di valenza era solo su clip condivise | Valenza come task secondario su split FM | 🆕 Valenza anche su leave-clip-out e a parità di dati | ✅ |
 | Perimetro | 5 dataset previsti in prospettiva | 🔀 Solo FACED e CBraMod; gli altri sono un'espansione futura | decisione |
@@ -169,7 +169,7 @@ Limite 🔀: per CBraMod la sonda sull'embedding medio (200 dimensioni) perde l'
 | z-score delle feature per soggetto | aiuto | +4.7 (DE) |
 | BN-α sulla sessione | aiuto modesto | TSception +2.2 (p 1e-5; +0.9 sulle clip non viste); EEGNet +1.1; n0 scelto quasi sempre 8 |
 | BN-α online (prime n finestre / causale) | curva crescente con n | first32 ≈ metà del guadagno; streaming ≈ +1 |
-| EA / z-score su CBraMod | aiuto? | ⛔ non valido (bug di scala) → ⏳ |
+| EA / z-score su CBraMod | aiuto? | **EA −16.0 (tutti i soggetti peggiorano); z-score −1.7 (p 0.048)**; clip non viste con EA 0.123 (n.s.). L'allineamento aiuta i modelli compatti ma non il foundation model |
 
 ---
 
@@ -180,7 +180,7 @@ H3 e H4 sono valutate sul modello migliore, CBraMod LoRA, come previsto dal pian
 | Ipotesi | Attesa | Ottenuto | p Holm | Esito |
 |---|---|---|---|---|
 | H1: il pretraining aiuta | +2.8 (paper) | +0.8 (ricette scelte in validation) | 0.21 | ❌ non confermata |
-| H2: l'allineamento aiuta | sì | +8.4 (TSception) | 2e-6 | ✅ confermata (CBraMod ⏳) |
+| H2: l'allineamento aiuta | sì | +8.4 (TSception) | 2e-6 | ✅ confermata per TSception; **non si estende a CBraMod** (EA −16.0, z-score −1.7; esplorativo) |
 | H3: stimolo visto, corretto > 0 | > 0 | +2.2 (CBraMod); −1.9 (TSception) | 0.022 | ✅ in senso statistico, ma **non si trasferisce a stimoli nuovi** |
 | H4: bordo/EMG oltre il controllo | > 0 | +2.0 (CBraMod); n.s. (TSception) | 0.022 | ✅ in senso statistico, **attribuzione oculare/muscolare ⏳** |
 
@@ -201,8 +201,8 @@ Anche per la valenza il vantaggio sopra il caso dipende dalle clip condivise.
 
 | # | Dove | Cosa | Cosa verificare | Ipotesi o risultato in esame |
 |---|---|---|---|---|
-| 1 | Account 2, notebook B (36 job, circa 7 h) | CBraMod LoRA con EA e con z-score (scala robusta) | La loss scende sotto 2.2; BA contro LoRA senza allineamento | H2 sul foundation model |
-| 2 | Account 2, notebook B | CBraMod e TSception: solo passa-alto 4 Hz e solo passa-basso 30 Hz | Quale taglio spiega il −37.6 di CBraMod | Impronta della clip sotto 4 Hz (oculare/lenta) o sopra 30 Hz (EMG) |
+| 1 | ✅ Fatto (account 2, notebook C, 15 job) | CBraMod LoRA con EA e con z-score (scala robusta) | Impara; EA −16.0, z-score −1.7 | H2 non si estende al foundation model |
+| 2 | Account 2, notebook B (21 job; in input gli output di B e C) | CBraMod e TSception: solo passa-alto 4 Hz e solo passa-basso 30 Hz | Quale taglio spiega il −37.6 di CBraMod | Impronta della clip sotto 4 Hz (oculare/lenta) o sopra 30 Hz (EMG) |
 | 3 | Account 2, notebook B | CBraMod senza bordo frontale / temporale / 4 canali casuali | Quale metà del bordo spiega il −4.5 | Contributo oculare contro muscolare |
 | 4 | Account 1, notebook D (330 job, circa 2 sessioni) | TSception, DE, DE+z-score su `lnso10`, `lnso10_lco`, `lnso10_sizematched` (+ permutati); EMG facoltativo | Effetto minimo rilevabile su 123 soggetti; clip non viste contro il caso; scomposizione | Gate di potenza; generalizzazione reale a stimoli nuovi (+1.8 su split FM, al limite) |
 | 6 | Account 3, notebook E (33 job, circa 3 h) | EEGNet originale (Lawhern 2018) nel protocollo CBraMod; EEGNet con il framework di fine-tuning CBraMod; EEGNet originale + EA; leave-clip-out per le prime due + 2 permutati | BA su split FM contro 0.409 (CBraMod) e 0.229 (nostro); clip viste/non viste | Il divario con lo 0.409 dipende da finestra, ricetta o allineamento? Anche un EEGNet ben addestrato memorizza la clip? |

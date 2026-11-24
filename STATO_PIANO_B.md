@@ -162,6 +162,7 @@ soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binari
 | 10 | 24/11 | 2 / B (H1) | 16/16 | Da zero + warm-up 0.550 (3 seed); pre-addestrato + warm-up 0.521. **H1 (ricette scelte in validation): +0.008, p 0.21, n.s.** |
 
 | 11 | 24/11 | 3 / C (2 sessioni) | 88/88 | **CBraMod su clip non viste al caso**: ufficiale 0.111, LoRA 0.112 (viste 0.588 / 0.558). LoRA = ufficiale su split FM (0.558). Memorizzazione della clip 0.445 sopra il caso. EMG: 4–30 Hz −37.6 punti; senza bordo −4.5. **Varianti EA/z-score di CBraMod non valide** (riscalatura dominata dagli artefatti), invalidate e in ripetizione. |
+| 12 | 24/11 | 2 / C (ripetizione, con l'output dell'account 3) | 15/15 | **Allineamento su CBraMod ripetuto con la scala robusta: ora impara in tutti i 15 job, ma non aiuta.** EA 0.397 (−16.0, tutti i 23 soggetti peggiorano); z-score 0.540 (−1.7, p 0.048). Clip non viste con EA 0.123 (+1.2 sul caso, p 0.07, n.s.). |
 
 **Risultati del notebook C (2026-11-24), 23 soggetti, caso 0.111:**
 - **Clip non viste (risultato centrale):**
@@ -185,6 +186,14 @@ soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binari
 - **Sonda della clip (embedding medio da 200 dimensioni):** accuratezza 8.4% (caso 3.6%), BA dalla clip 0.156 contro modello 0.555. La media su canali e patch perde l'identità che la testa da 64 000 dimensioni usa: la sonda sottostima. È un limite.
 - **CBraMod con EA / z-score: non validi.** In 13 job su 15 la loss resta a 2.22 (caso). Causa probabile: la riscalatura all'RMS dei primi 5 soggetti include sub003/sub004 (artefatti fino a 87 000 µV) e gonfia la scala degli ingressi. Corretto con una scala robusta (mediana delle deviazioni standard per canale su 20 soggetti); job invalidati (`INVALIDATED`) e ripetuti sul notebook B.
 
+**Ripetizione EA / z-score su CBraMod LoRA (sessione 12, scala robusta, 3 seed):**
+- Tutti i 15 job imparano (validation 0.45–0.59); il problema di scala è risolto.
+- **EA: 0.397 contro 0.557 senza allineamento (−16.0 punti, p 2e-7, peggiorano tutti i 23 soggetti).**
+- **z-score per soggetto: 0.540 (−1.7, p 0.048, peggiorano 17 soggetti su 23).**
+- Leave-clip-out con EA: viste 0.450, non viste 0.123 (+1.2 sul caso, p 0.07, n.s.; il segnale viene quasi tutto dal fold 0: 0.14 contro 0.12 e 0.11). Rispetto a LoRA senza allineamento sulle non viste: +1.1, p 0.11, n.s.
+- **Lettura:** l'allineamento che regge i modelli compatti (+8.4 TSception, +9.8 EEGNet) danneggia il foundation model. EA ruota e mescola i canali: le patch non hanno più la statistica spaziale e spettrale vista nel pre-training, e la testa all_patch_reps lavora canale per canale. Lo z-score toglie solo la scala per canale e costa poco. L'eterogeneità tra soggetti, che EA compensa nei modelli compatti, CBraMod la assorbe già nella rappresentazione. Nessuna delle due varianti cambia il risultato centrale: sulle clip nuove si resta intorno al caso.
+- Correzione al riepilogo: il JSON compatto poteva riportare i test di permutazione dei job invalidati (i record per job non avevano l'orario). Ora ogni record ha l'orario e i vecchi lo prendono dal file `done`; le tabelle per soggetto erano già corrette.
+
 **Ipotesi primarie con i dati attuali (Holm su 4).** H3 e H4 sono sul modello migliore pre-registrato, CBraMod LoRA (`--best auto`):
 - H1 pretraining: +0.008, p Holm 0.21, n.s.;
 - H2 allineamento (TSception): +0.084, p Holm 2e-6, confermata;
@@ -203,11 +212,10 @@ H3 e H4 per ora valgono per TSception; per CBraMod servono i notebook C e D.
 
 **Account 3, notebook C (CBraMod, 88 job)**: completato il 2026-11-24 (vedi sessione 11).
 
-**Account 2, notebook B (aggiunte del 2026-11-24, 36 job, circa 7 h)**
+**Account 2, notebook B (aggiunte del 2026-11-24, 21 job rimasti).** EA/z-score già fatti nella sessione 12. Allegare in input gli output del notebook B e del notebook C: il ripristino unisce gli stati e salta i 15 job completati.
 
 | Blocco | Cosa verificare | Ipotesi testata |
 |---|---|---|
-| CBraMod LoRA con EA (split FM + LCO, 3 seed) e con z-score (3 seed), riscalatura robusta | La loss scende sotto 2.2? BA contro LoRA senza allineamento | L'allineamento aiuta anche un foundation model? (H2 esteso) |
 | CBraMod LoRA e TSception: solo passa-alto 4 Hz, solo passa-basso 30 Hz (3 seed) | Quale dei due spiega il crollo a 4–30 Hz (0.555 → 0.179)? | L'impronta della clip sta sotto 4 Hz (oculare/lenta) o sopra 30 Hz (EMG)? |
 | CBraMod LoRA senza bordo frontale (Fp1, Fp2, F7, F8) / temporale (FC5, FC6, T7, T8) / 4 canali casuali | Quale metà del bordo spiega i −4.5 punti? | Il contributo del bordo è oculare o muscolare? |
 

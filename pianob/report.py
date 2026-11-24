@@ -47,15 +47,43 @@ def _tk_rows_from_state(recs) -> list[dict]:
     return out
 
 
+def attach_job_times(jobs: list[dict], done: list[dict]) -> list[dict]:
+    """Le righe jobs_*.jsonl del codice più vecchio non hanno "t": lo prende dalla n-esima riga done dello
+    stesso job nello stesso worker (i due file sono scritti nello stesso ordine)."""
+    from collections import defaultdict
+    times = defaultdict(list)
+    from .experiments.queue import DONE_STATUSES
+    for d in done:   # solo gli esiti che scrivono un record (non failed/interrupted)
+        if d.get("status") in DONE_STATUSES:
+            times[d.get("job_id")].append(d.get("t"))
+    seen = defaultdict(int)
+    for j in jobs:
+        i = seen[j["job_id"]]
+        seen[j["job_id"]] += 1
+        if j.get("t") is None and i < len(times[j["job_id"]]):
+            j["t"] = times[j["job_id"]][i]
+    return jobs
+
+
+def latest_valid_jobs(jobs: list[dict]) -> list[dict]:
+    """Un record per job: scarta quelli invalidati e, a parità di job, tiene il più recente."""
+    from .experiments.queue import is_invalid_record
+    ok = [j for j in jobs if not is_invalid_record(j["job_id"], j.get("t"))]
+    ok.sort(key=lambda j: (j.get("t") is not None, j.get("t") or 0))
+    return list({j["job_id"]: j for j in ok}.values())
+
+
+def _read_jsonl(p) -> list[dict]:
+    return [json.loads(l) for l in Path(p).read_text().splitlines() if l.strip()] if Path(p).exists() else []
+
+
 def load_jobs(paths=None) -> list[dict]:
     paths = paths or sorted((kaggle_env.state_dir() / "results").glob("jobs_*.jsonl"))
-    out = {}
-    for p in paths:
-        for line in Path(p).read_text().splitlines():
-            if line.strip():
-                r = json.loads(line)
-                out[r["job_id"]] = r
-    return list(out.values())
+    out = []
+    for p in map(Path, paths):
+        done = p.parent.parent / "done" / p.name.replace("jobs_", "done_")
+        out += attach_job_times(_read_jsonl(p), _read_jsonl(done))
+    return latest_valid_jobs(out)
 
 
 KEYS = ["config", "protocol", "task", "variant", "test_condition"]

@@ -183,7 +183,7 @@ def run_job(job: Job, ctx: Context) -> str:
 def _write(job, ctx, rows, record):
     st = kaggle_env.state_dir()
     append_jsonl(st / "results" / f"rows_{ctx.worker}.jsonl", rows)
-    append_jsonl(st / "results" / f"jobs_{ctx.worker}.jsonl", [record])
+    append_jsonl(st / "results" / f"jobs_{ctx.worker}.jsonl", [{**record, "t": round(time.time())}])
 
 
 def _conditions(jd: JobData):

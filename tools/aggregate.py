@@ -33,7 +33,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from pianob.eval.shortcuts import (decomposition_lines, delta_emg, delta_stim, stim_decomposition,  # noqa: E402
                                    tk_rows_from_preds)
 from pianob.eval.stats import holm, mde_paired, nadeau_bengio, paired_test  # noqa: E402
-from pianob.report import gate1, main_view, markdown_table, summarize  # noqa: E402
+from pianob.report import (attach_job_times, gate1, latest_valid_jobs, main_view, markdown_table,  # noqa: E402
+                           summarize)
 
 
 def _rows_from_lines(lines):
@@ -60,7 +61,10 @@ def load_inputs(paths) -> tuple[pd.DataFrame, list[dict], list[dict]]:
                     if re.search(r"results/rows_.*\.jsonl$", n):
                         rows += _rows_from_lines(io.TextIOWrapper(z.open(n)).read().splitlines())
                     elif re.search(r"results/jobs_.*\.jsonl$", n):
-                        jobs += _rows_from_lines(io.TextIOWrapper(z.open(n)).read().splitlines())
+                        dn = n.replace("results/jobs_", "done/done_")
+                        done = _rows_from_lines(z.read(dn).decode().splitlines()) if dn in z.namelist() else []
+                        jobs += attach_job_times(_rows_from_lines(io.TextIOWrapper(z.open(n)).read().splitlines()),
+                                                 done)
                     elif re.search(r"artifacts/preds/.*\.npz$", n):
                         with np.load(io.BytesIO(z.read(n))) as npz:
                             pred_rows += tk_rows_from_preds(Path(n).stem, npz)
@@ -68,7 +72,9 @@ def load_inputs(paths) -> tuple[pd.DataFrame, list[dict], list[dict]]:
             for f in p.rglob("rows_*.jsonl"):
                 rows += _rows_from_lines(f.read_text().splitlines())
             for f in p.rglob("jobs_*.jsonl"):
-                jobs += _rows_from_lines(f.read_text().splitlines())
+                dn = f.parent.parent / "done" / f.name.replace("jobs_", "done_")
+                done = _rows_from_lines(dn.read_text().splitlines()) if dn.exists() else []
+                jobs += attach_job_times(_rows_from_lines(f.read_text().splitlines()), done)
             for f in p.rglob("artifacts/preds/*.npz"):
                 with np.load(f) as npz:
                     pred_rows += tk_rows_from_preds(f.stem, npz)
@@ -91,7 +97,7 @@ def load_inputs(paths) -> tuple[pd.DataFrame, list[dict], list[dict]]:
                                                       "test_condition", "task", "subject"])
         df = df.drop_duplicates(subset=["config", "protocol", "fold", "seed", "variant", "test_condition", "task",
                                         "subject"], keep="last")
-    return df, jobs, compact
+    return df, latest_valid_jobs(jobs), compact
 
 
 def subj_series(df, config, protocol="split_fm", variant="base", cond="all", task="emo9", metric="ba_win"):
