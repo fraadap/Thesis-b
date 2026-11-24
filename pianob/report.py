@@ -162,10 +162,11 @@ def shortcut_summary(df: pd.DataFrame) -> dict:
                 dec = stim_decomposition(df, c, bp, task=t)
                 if dec:
                     out["decomposition"][f"{c}|{bp}{sfx}"] = dec
-        e = delta_emg(df, c)
-        if e and len(e) > 2:
-            out["emg"][c] = {k: (np.round(v, 3).tolist() if isinstance(v, list) and k != "subjects" else v)
-                             for k, v in e.items()}
+        for ep in ("split_fm", "lnso10"):
+            e = delta_emg(df, c, protocol=ep)
+            if e and len(e) > 2:
+                out["emg"][c if ep == "split_fm" else f"{c}|{ep}"] = {k: (np.round(v, 3).tolist() if isinstance(v, list) and k != "subjects" else v)
+                                 for k, v in e.items()}
     return out
 
 

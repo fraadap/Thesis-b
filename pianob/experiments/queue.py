@@ -293,21 +293,31 @@ def queue_nbC() -> list[Job]:
     return J
 
 
-def queue_nbD(final_configs=("tsception_ea", "cbramod_lora_r2", "de_asym_lr")) -> list[Job]:
-    """lnso10 (3 seed) + lnso10_lco per le config finali. Per CBraMod lnso10_lco con 1 seed (30 job da
-    ~20 min su T4): il budget completo a 3 seed supererebbe ~50 GPU-h. Da rigenerare quando le config
-    finali sono scelte (Gate di potenza dopo le prime due config)."""
+def queue_nbD() -> list[Job]:
+    """10 fold sui soggetti (tutti i 123 soggetti finiscono in test una volta), modelli compatti e feature.
+    Motivo: potenza statistica (23 -> 123 soggetti appaiati) e indipendenza da un singolo split.
+    Ordine di priorità: (1) lnso10 per il gate di potenza, (2) leave-clip-out, (3) controllo della quantità
+    di dati + permutazioni per le correzioni, (4) feature, (5) EMG (facoltativo, in coda).
+    CBraMod sui 10 fold: coda separata, da definire dopo il notebook C (config finale CBraMod)."""
     J = []
-    for c in final_configs:
-        if c.startswith(("de_", "logpower", "const")):
-            J += train_jobs(c, ["lnso10", "lnso10_lco"], [0])
-        elif c.startswith("cbramod"):
-            J += train_jobs(c, ["lnso10"], SEEDS3) + train_jobs(c, ["lnso10_lco"], [0])
-        else:
-            J += train_jobs(c, ["lnso10", "lnso10_lco"], SEEDS3)
-    # controllo della quantità di dati: solo per le 2 config finali, 1 seed x 1 estrazione
-    for c in final_configs[:2]:
-        J += train_jobs(c, ["lnso10_sizematched"], [0], draws=[0])
+    # (1) gate di potenza: TSception vs DE (e vs caso) su 123 soggetti
+    J += train_jobs("const_majority", ["lnso10"], [0])
+    J += train_jobs("tsception_ea", ["lnso10"], SEEDS3)
+    J += train_jobs("de_asym_lr", ["lnso10"], [0])
+    J += train_jobs("de_asym_lr_zsub", ["lnso10"], [0])
+    # (2) leave-clip-out: Δstim appaiato e generalizzazione a stimoli nuovi con piena potenza
+    J += train_jobs("tsception_ea", ["lnso10_lco"], SEEDS3)
+    # (3) quantità di dati vs novità dello stimolo (H3) + permutazioni a livello di clip per le correzioni
+    J += sizematched_jobs("tsception_ea", [0], draws=[0], n_perm_models=1, protocol="lnso10_sizematched")
+    J += perm_jobs("tsception_ea", "lnso10_lco", perms=[0])
+    # (4) feature (CPU): leave-clip-out e controllo della quantità di dati con permutazioni interne
+    J += [Job("train", c, "lnso10_lco", f, 0, n_perm=20) for c in ("de_asym_lr_zsub",)
+          for f in _folds("lnso10_lco")]
+    J += [Job("train", "de_asym_lr_zsub", "lnso10_sizematched", f, 0, draw=0, n_perm=20)
+          for f in _folds("lnso10_sizematched")]
+    # (5) facoltativo: EMG con piena potenza (1 seed, 2 estrazioni di controllo)
+    J += [Job("train", "tsception_ea", "lnso10", f, 0, band=[4, 30], drop=d) for d in ("edge8", "rand8_d0", "rand8_d1")
+          for f in _folds("lnso10")]
     return J
 
 

@@ -33,9 +33,11 @@ def test_tsception_ea_lco_end_to_end(ctx, tmp_path):
         assert k in base[0]
     bn = {r["variant"] for r in rows if r["config"] == "tsception_ea_bnalpha"}
     assert "bnalpha_session_n00" in bn and "bnalpha_stream_n032" in bn and any(v.endswith("n0sel") for v in bn)
-    # finestre unseen: 9 clip non viste nel fold 1 x 7 finestre
+    # finestre unseen: 9 clip non viste nel fold 1 x (30 s / finestra) finestre (finestra da Optuna se presente)
+    from pianob.experiments.registry import resolve_config
+    w = resolve_config("tsception_ea")[0].window_s
     unseen = [r for r in base if r["test_condition"] == "unseen"][0]
-    assert unseen["n_trials"] == 9 and unseen["n_windows"] == 63
+    assert unseen["n_trials"] == 9 and unseen["n_windows"] == 9 * int(30 // w)
 
 
 def test_cbramod_random_weights_end_to_end(ctx, tmp_path):

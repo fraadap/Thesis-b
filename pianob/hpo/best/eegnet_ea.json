@@ -1,0 +1,16 @@
+{
+ "study": "eegnet_ea",
+ "params": {
+  "lr": 0.002307285984914344,
+  "weight_decay": 0.0005711167027691999,
+  "dropout": 0.1105342297586926,
+  "F1": 8,
+  "D": 2,
+  "window_s": 4
+ },
+ "value": 0.27294973544973533,
+ "trial": 35,
+ "n_complete": 20,
+ "n_pruned": 21,
+ "best_epoch": 32
+}

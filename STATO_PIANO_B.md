@@ -139,58 +139,82 @@ Coda: 178/208 job; **completata (208/208) con la ripresa del 2026-11-23**.
     - H4 EMG n.s. (p Holm 0.42).
 - **Optuna CBraMod con LoRA completato:** 13 trial completi + 18 potati. Migliore BA di validation 0.600 con rango 4, lr testa 8.2e-4, lr LoRA 3.1e-4, dropout LoRA 0.27, label smoothing 0.2, warm-up della testa 3 epoche, testa ufficiale. Salvato in `pianob/hpo/best/cbramod_lora_r2.json`: il notebook C lo trova senza collegare l'output del notebook B.
 
-## Checklist delle run (aggiornata il 2026-11-23)
+## Checklist delle run (aggiornata il 2026-11-24)
 
-Legenda: [x] fatto · [ ] da fare · (opz.) facoltativo.
+Legenda: [x] fatto · [ ] da fare · (opz.) facoltativo. Tutte le BA sono a livello di finestra, media per
+soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binario), salvo dove indicato.
 
-**Account 1 (notebook A, TSception ed EEGNet)**
-- [x] Baseline su feature, Optuna TSception ed EEGNet, TSception ed EEGNet su split FM e leave-clip-out, BN-α, ablazioni senza EA, ablazione EMG, permutazioni Δstim, sonda della clip, controllo della quantità di dati (9 classi), valenza su split FM. 208 job.
-- [x] **Valenza binaria su stimoli nuovi** (58 job, completati il 2026-11-24):
-  - TSception su leave-clip-out (3 seed) e a parità di dati (3 seed × 2 estrazioni);
-  - permutazioni per entrambe le correzioni;
-  - DE su leave-clip-out e a parità di dati, più la rivalutazione su T_k.
+### Sessioni completate
 
-**Account 2 (notebook B, CBraMod)**
-- [x] Gate 1: ricetta ufficiale su split FM, 3 seed → **passato** (0.558).
-- [x] Init casuale, stessa ricetta, 3 seed → collasso (vedi sopra).
-- [x] Optuna CBraMod con LoRA, 30 trial (31 finiti in una sessione).
-- [x] Diagnostica dell'init casuale: impara solo con il warm-up delle LR.
-- [x] H1: da zero con warm-up (3 seed) e pre-addestrato con warm-up (3 seed) completati. H1 n.s. con le ricette scelte in validation.
-- (opz.) Optuna sulla ricetta ufficiale (lr e `multi_lr`, 10 trial) se il Gate 1 non passa per poco.
+| # | Data | Account / notebook | Job | Esito principale |
+|---|---|---|---|---|
+| 1 | 21/11 | qualsiasi / smoke test | 8 | Pipeline funzionante sui dati veri; pesi CBraMod caricati, checksum OK. |
+| 2 | 21/11 | 1 / A (prima sessione) | 63/156 | Optuna TSception (val 0.239, finestre da 6 s) ed EEGNet (val 0.273). TSception+EA 0.212, EEGNet+EA 0.229, DE 0.185, DE+z-score 0.232. LCO: clip non viste 0.12–0.145. BN-α +2.2 (TSception). |
+| 3 | 21–22/11 | 1 / A (ripresa) | 178/208 | Allineamento: +8.4 (TSception), +9.8 (EEGNet); senza EA quasi al caso (0.128–0.131). Scomposizione: dati +1.6, stimolo +6.8, corretto −1.9. Sonda della clip: 10.5% (caso 3.6%). **Bug**: inf in float16 nella cache 4–30 Hz (5 job invalidati, 30 falliti). |
+| 4 | 22/11 | 1 / A (codice non aggiornato) | 0 | Run inutile: zip del codice non ricostruito. |
+| 5 | 23/11 | 1 / A (ripresa) | 208/208 | EMG: 4–30 Hz senza bordo 0.210 contro piena 0.212; controllo con canali casuali 0.214; H4 n.s. (p 0.27). |
+| 6 | 23/11 | 2 / B (senza GPU) | 0 | Sessione partita su CPU, 11 h sprecate. Aggiunto lo stop immediato se manca la GPU. |
+| 7 | 23/11 | 2 / B | 8/8 | **Gate 1 passato**: 0.5579 pooled (paper 0.5509), BA per soggetto 0.558, trial 0.751. Da zero con ricetta esatta: collasso (0.111). Optuna LoRA: val 0.600. |
+| 8 | 24/11 | 1 / A (valenza) | 266/266 | Valenza binaria: clip condivise 0.556 (TSception), 0.543 (DE); **clip non viste 0.515 e 0.509 (n.s.)**; vantaggio da stimolo visto interamente spiegato da memorizzazione. |
+| 9 | 24/11 | 2 / B (diagnostica) | 11/11 | Da zero: impara solo con il warm-up delle LR (0.534). |
+| 10 | 24/11 | 2 / B (H1) | 16/16 | Da zero + warm-up 0.550 (3 seed); pre-addestrato + warm-up 0.521. **H1 (ricette scelte in validation): +0.008, p 0.21, n.s.** |
 
-**Account 3 (notebook C)**, 88 job, circa 2–3 sessioni. **Può partire ora**: Gate 1 passato, iperparametri LoRA nel codice.
-- [ ] LoRA su split FM (3 seed) e leave-clip-out (5 seed); ricetta ufficiale su leave-clip-out (5 seed).
-- [ ] LoRA con EA (split FM e leave-clip-out, 3 seed); LoRA con z-score (3 seed).
-- [ ] Controllo della quantità di dati con CBraMod (3 seed + 2 permutati) **prima** dell'ablazione EMG.
-- [ ] Ablazione EMG con CBraMod (3 seed, 3 estrazioni di controllo); sonda della clip; permutazioni Δstim (2).
+**Ipotesi primarie con i dati attuali (Holm su 4):**
+- H1 pretraining: +0.008 (p Holm 0.42), n.s.;
+- H2 allineamento: +0.084 (p Holm 2e-6), confermata;
+- H3 Δstim^size corretto > 0: −0.019 (p Holm 0.049), segno opposto, cioè vantaggio interamente compatibile con memorizzazione della clip;
+- H4 EMG oltre il controllo: +0.004 (p Holm 0.42), n.s.
 
-**A rotazione (notebook D, 10 fold sui soggetti)**, dopo la scelta delle config finali:
-- [ ] Config finali su `lnso10` (3 seed) e `lnso10_lco` (TSception 3 seed, CBraMod 1 seed, DE 1).
-- [ ] `lnso10_sizematched` per le 2 config finali (1 seed × 1 estrazione).
-- [ ] Gate di potenza dopo le prime 2 config.
-- (opz.) Anticipare la parte TSception e DE sull'account 1 con una coda dedicata (non dipende da CBraMod).
+H3 e H4 per ora valgono per TSception; per CBraMod servono i notebook C e D.
+
+### Prossime run
+
+**Account 3, notebook C (CBraMod, 88 job, 2–3 sessioni)**, da lanciare ora.
+
+| Blocco | Cosa verificare nei risultati | Risultato / ipotesi testata |
+|---|---|---|
+| LoRA su split FM (3 seed) | BA vicina alla ricetta ufficiale (0.558); parametri allenabili molto inferiori | Una variante efficiente è equivalente al full fine-tuning? (esplorativo) |
+| LoRA (5 seed) e ricetta ufficiale (5 seed) su leave-clip-out | BA sulle clip non viste rispetto al caso (0.111) e al TSception (0.130); divario viste/non viste | **Il vantaggio di CBraMod (0.558 contro 0.212) regge su stimoli nuovi?** È il risultato centrale del lavoro. |
+| Controllo a parità di dati con CBraMod (3 seed + 2 permutati) | BA_full, BA_size, BA_unseen su T_k; BA_size con label permutate | H3 per il foundation model: il vantaggio da stimolo visto è memorizzazione anche per CBraMod? |
+| LoRA con EA e con z-score per soggetto (3 seed) | Differenza appaiata contro LoRA senza allineamento, su clip condivise e non viste | L'allineamento aiuta anche un foundation model? (H2 esteso, esplorativo) |
+| Ablazione EMG con CBraMod (3 seed, 3 estrazioni di controllo) | 4–30 Hz senza bordo contro 4–30 Hz senza canali casuali; recall di amusement e disgust | H4 per il foundation model: CBraMod sfrutta l'EMG (alte frequenze, canali di bordo)? |
+| Sonda della clip e permutazioni Δstim | Accuratezza della clip dagli embedding; BA ottenuta dalla clip predetta contro BA del modello | Le rappresentazioni di CBraMod codificano l'identità dello stimolo? |
+
+**Account 1, notebook D (10 fold sui soggetti, modelli compatti e feature, 330 job, circa 2 sessioni)**, da lanciare ora.
+
+| Blocco | Cosa verificare | Risultato / ipotesi testata |
+|---|---|---|
+| `lnso10`: TSception (3 seed), DE, DE+z-score, classe maggioritaria | BA su 123 soggetti; deviazione standard delle differenze appaiate → effetto minimo rilevabile (`power_gate` in `tools/aggregate.py`) | **Gate di potenza:** l'effetto minimo rilevabile scende sotto 2 punti? I risultati di split FM dipendono dai 23 soggetti scelti? |
+| `lnso10_lco`: TSception (3 seed) + 1 permutato per fold | BA sulle clip non viste contro il caso, con 123 soggetti | Esiste una generalizzazione a stimoli nuovi, piccola ma reale? Su split FM: +1.8 punti, al limite della rilevabilità. |
+| `lnso10_sizematched`: TSception (1 seed) + 1 permutato per fold | Scomposizione per soggetto su 123 soggetti | H3 con piena potenza: la quantità di dati conta davvero poco? Il Δstim^size corretto resta ≤ 0? |
+| DE + z-score su leave-clip-out e a parità di dati (20 permutazioni interne) | Stessa scomposizione per la baseline su feature | Il quadro è lo stesso con feature classiche? |
+| (opz., in fondo) EMG: 4–30 Hz senza bordo e senza 8 canali casuali (2 estrazioni), 1 seed | ΔEMG contro controllo, con 123 soggetti | H4 con piena potenza: l'effetto minimo rilevabile scende da 1.5 a circa 0.6 punti. |
+
+Limite noto: gli iperparametri vengono da Optuna su split FM, che usa i soggetti 080–099 come validation. Nei fold 7–9 di `lnso10` quegli stessi soggetti sono di test, quindi la stima sui 10 fold è leggermente ottimistica. Rimedio facoltativo: tuning annidato per fold di TSception.
+
+**Account 2: libero.** Opzioni:
+- dividere con l'account 3 il notebook C (coda separata con controllo a parità di dati ed EMG di CBraMod);
+- poi CBraMod sui 10 fold, con la configurazione finale scelta dal notebook C.
+
+| Blocco | Cosa verificare | Risultato / ipotesi testata |
+|---|---|---|
+| CBraMod (config finale) su `lnso10` (3 seed), `lnso10_lco` e `lnso10_sizematched` (1 seed) | Come per TSception | Le conclusioni del foundation model valgono su tutti i 123 soggetti? (coda da definire dopo il notebook C) |
 
 **Facoltativi / condizionati**
-- (opz.) EEGNet nel controllo della quantità di dati (circa 3 GPU-h).
-- (opz.) EEGNet con la ricetta CBraMod (finestre da 10 s, niente EA, 50 epoche, selezione sul kappa), per il confronto con lo 0.409 riportato da CBraMod. Ha senso se il Gate 1 passa.
-- (opz.) Variante di sensibilità con clipping robusto delle ampiezze (sub003/004/023/030/056/064/120).
-- (opz.) Tuning annidato per fold di TSception (15 trial per fold esterno).
-- (opz.) Arousal binario: servono i self-report dai dati grezzi (file da individuare su Synapse).
-- Fuori perimetro per ora: altri dataset, REVE, Proposte 2–3 e preprocessing dai raw (sessioni successive).
+- (opz.) EEGNet con la ricetta CBraMod (finestre da 10 s, niente EA, 50 epoche): spiega il divario con lo 0.409 riportato da CBraMod per EEGNet?
+- (opz.) EEGNet nel controllo a parità di dati (circa 3 GPU-h).
+- (opz.) Clipping robusto delle ampiezze anomale (sub003/004/023/030/056/064/120): le conclusioni sono sensibili agli artefatti?
+- (opz.) Tuning annidato per fold di TSception: quanto è ottimistica la stima sui 10 fold?
+- (opz.) Arousal binario: servono i self-report dai dati grezzi.
+- Fuori perimetro per ora: altri dataset, REVE, Proposte 2–3, preprocessing dai raw.
 
 ## Prossimi passi
 
-1. Smoke test su Kaggle con i dati veri. Controllare canali, ampiezze, mappa delle label e pesi.
-2. In parallelo:
-   - account 1 → notebook A (baseline e TSception);
-   - account 2 → notebook B (**Gate 1**).
-3. Gate 1 passato → account 3 → notebook C (serve l'Optuna di LoRA dal notebook B).
-4. Gate 2: tabelle complete su `split_fm`, `split_fm_lco` e `split_fm_sizematched` con `tools/aggregate.py`, inclusa la scomposizione quantità di dati / novità dello stimolo.
-5. Scegliere le config finali → rigenerare `queues/nbD_lnso10.json` → `lnso10` / `lnso10_lco` → gate di potenza.
-6. Sessione successiva:
-   - preprocessing dai raw (Picard + ICLabel) per l'analisi EMG estesa e per le clip intere;
-   - Proposta 2 (ISC/MIL);
-   - Proposta 3 (prior di normalizzazione).
+1. Account 3 → notebook C (risultato centrale: CBraMod su stimoli nuovi).
+2. Account 1 → notebook D (10 fold, gate di potenza).
+3. Account 2 → metà del notebook C oppure, dopo il notebook C, CBraMod sui 10 fold.
+4. Gate 2 con `tools/aggregate.py` su tutti gli zip; poi stesura dei risultati.
+5. Sessione successiva: preprocessing dai raw, Proposte 2–3.
 
 ## Gate
 
