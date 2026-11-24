@@ -108,6 +108,18 @@ Coda: 178/208 job; **completata (208/208) con la ripresa del 2026-11-23**.
   - Su CPU: con l'init kaiming(fan_out) del codice ufficiale le feature del backbone hanno deviazione standard circa 5, contro 1.5 con l'init di default di PyTorch; i logit iniziali sono piccoli in entrambi i casi.
   - Coerente con la issue #22 del repo.
   - **H1 contro questo controllo sarebbe banale**: serve un "da zero" che impari. Diagnostica in coda sul notebook B (1 seed per variante, una modifica alla volta): init di default; warm-up lineare delle LR per 3 epoche; entrambe. La variante che impara si porta a 3 seed per H1. Si riportano sia la ricetta esatta (collasso) sia la variante, dichiarando la deviazione.
+- **Diagnostica dell'init casuale (2026-11-24, seed 3407).** Una modifica alla volta rispetto alla ricetta esatta:
+
+  | Variante | BA pooled | κ | F1w | Loss 1ª epoca |
+  |---|---|---|---|---|
+  | Init di default | 0.111 (collasso) | – | – | 5.2 |
+  | **Warm-up delle LR (3 epoche)** | **0.5345** | 0.474 | 0.539 | 2.3 |
+  | Init di default + warm-up | 0.5246 | 0.464 | 0.530 | 2.2 |
+
+  - La causa del collasso è la learning rate piena dalla prima iterazione, non l'inizializzazione.
+  - Il valore 0.534 è coerente con quello del paper senza pretraining (circa 0.523).
+  - **Deviazione dichiarata per H1:** confronto a ricetta identica, pre-addestrato con warm-up contro da zero con warm-up (3 seed ciascuno, in coda sul notebook B). In mancanza, pre-addestrato ufficiale contro da zero con warm-up. Il confronto con il collasso resta solo come riferimento.
+  - Stima preliminare (3 seed contro 1): +0.023 (p 0.018, p Holm 0.049; peggiora il 26% dei soggetti). Il pretraining aiuta poco, come nel paper (+2.8).
 - **Optuna CBraMod con LoRA completato:** 13 trial completi + 18 potati. Migliore BA di validation 0.600 con rango 4, lr testa 8.2e-4, lr LoRA 3.1e-4, dropout LoRA 0.27, label smoothing 0.2, warm-up della testa 3 epoche, testa ufficiale. Salvato in `pianob/hpo/best/cbramod_lora_r2.json`: il notebook C lo trova senza collegare l'output del notebook B.
 
 ## Checklist delle run (aggiornata il 2026-11-23)
@@ -125,7 +137,8 @@ Legenda: [x] fatto · [ ] da fare · (opz.) facoltativo.
 - [x] Gate 1: ricetta ufficiale su split FM, 3 seed → **passato** (0.558).
 - [x] Init casuale, stessa ricetta, 3 seed → collasso (vedi sopra).
 - [x] Optuna CBraMod con LoRA, 30 trial (31 finiti in una sessione).
-- [ ] **Diagnostica dell'init casuale** (3 job, circa 1 h), poi 3 seed della variante che impara (H1).
+- [x] Diagnostica dell'init casuale: impara solo con il warm-up delle LR.
+- [ ] **H1 a ricetta identica:** da zero con warm-up (seed 1 e 2) + pre-addestrato con warm-up (3 seed). 5 job, circa 1.5 h.
 - (opz.) Optuna sulla ricetta ufficiale (lr e `multi_lr`, 10 trial) se il Gate 1 non passa per poco.
 
 **Account 3 (notebook C)**, 88 job, circa 2–3 sessioni. **Può partire ora**: Gate 1 passato, iperparametri LoRA nel codice.

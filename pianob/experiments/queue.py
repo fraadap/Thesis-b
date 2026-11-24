@@ -272,6 +272,10 @@ def queue_nbB() -> list[Job]:
     # Diagnostica dell'init casuale (aggiunta 2026-11-24): 1 seed per variante, poi 3 seed per quella che impara
     J += [Job("train", c, "split_fm", 0, 3407) for c in
           ("cbramod_scratch_ft_definit", "cbramod_scratch_ft_warmup", "cbramod_scratch_ft_definit_warmup")]
+    # Esito (2026-11-24): impara solo con il warm-up delle LR -> 3 seed del da-zero con warm-up e, per H1 a
+    # ricetta identica, il pre-addestrato con lo stesso warm-up
+    J += [Job("train", "cbramod_scratch_ft_warmup", "split_fm", 0, s) for s in (1, 2)]
+    J += train_jobs("cbramod_ft_official_warmup", ["split_fm"], CBRAMOD_SEEDS3)
     return J
 
 

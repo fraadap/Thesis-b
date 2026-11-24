@@ -110,9 +110,16 @@ def paired(df, a, b, **kw):
 
 def primary_hypotheses(df, best: str) -> dict:
     res = {}
-    r = paired(df, "cbramod_ft_official", "cbramod_scratch_ft")
-    if r:
-        res["H1_pretraining"] = r
+    # H1: la ricetta esatta da zero collassa (classe costante, cfr. issue #22). Deviazione dichiarata:
+    # confronto a ricetta identica con warm-up delle LR; in mancanza, pre-addestrato ufficiale vs da zero con
+    # warm-up; il confronto con il collasso resta solo come riferimento.
+    for a_, b_ in (("cbramod_ft_official_warmup", "cbramod_scratch_ft_warmup"),
+                   ("cbramod_ft_official", "cbramod_scratch_ft_warmup"),
+                   ("cbramod_ft_official", "cbramod_scratch_ft")):
+        r = paired(df, a_, b_)
+        if r:
+            res["H1_pretraining"] = {**r, "pair": f"{a_} vs {b_}"}
+            break
     r = paired(df, "tsception_ea", "tsception_noalign")
     if r:
         res["H2_allineamento"] = r
@@ -132,7 +139,8 @@ def primary_hypotheses(df, best: str) -> dict:
 
 def exploratory(df) -> dict:
     out = {}
-    pairs = [("eegnet_ea", "eegnet_noalign"), ("cbramod_lora_r2_ea", "cbramod_lora_r2"),
+    pairs = [("cbramod_ft_official", "cbramod_scratch_ft_warmup"), ("cbramod_ft_official_warmup", "cbramod_ft_official"),
+             ("cbramod_ft_official", "cbramod_scratch_ft"), ("eegnet_ea", "eegnet_noalign"), ("cbramod_lora_r2_ea", "cbramod_lora_r2"),
              ("cbramod_lora_r2", "cbramod_ft_official"), ("tsception_ea", "de_asym_lr"),
              ("cbramod_lora_r2", "tsception_ea"), ("cbramod_ft_official", "tsception_ea"),
              ("de_asym_lr_zsub", "de_asym_lr"), ("tsception_ea_bnalpha", "tsception_ea")]
