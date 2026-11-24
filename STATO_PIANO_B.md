@@ -139,6 +139,8 @@ Coda: 178/208 job; **completata (208/208) con la ripresa del 2026-11-23**.
     - H4 EMG n.s. (p Holm 0.42).
 - **Optuna CBraMod con LoRA completato:** 13 trial completi + 18 potati. Migliore BA di validation 0.600 con rango 4, lr testa 8.2e-4, lr LoRA 3.1e-4, dropout LoRA 0.27, label smoothing 0.2, warm-up della testa 3 epoche, testa ufficiale. Salvato in `pianob/hpo/best/cbramod_lora_r2.json`: il notebook C lo trova senza collegare l'output del notebook B.
 
+Vista d'insieme (atteso contro ottenuto, piano contro deviazioni): `CHECKLIST_PIANO_B.md`.
+
 ## Checklist delle run (aggiornata il 2026-11-24)
 
 Legenda: [x] fatto · [ ] da fare · (opz.) facoltativo. Tutte le BA sono a livello di finestra, media per
