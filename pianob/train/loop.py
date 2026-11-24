@@ -208,6 +208,8 @@ def train_model(model: nn.Module, hp: dict, recipe: str, train_bank: TrialBank, 
                 torch.nn.utils.clip_grad_norm_([p for g in opt.param_groups for p in g["params"]], clip)
             scaler.step(opt)
             scaler.update()
+            if hasattr(model, "apply_constraints"):   # es. max-norm di EEGNet
+                model.apply_constraints()
             sched.step()
             losses.append(loss.item())
         if not np.isfinite(np.mean(losses)):

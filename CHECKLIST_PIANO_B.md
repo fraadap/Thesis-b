@@ -205,6 +205,7 @@ Anche per la valenza il vantaggio sopra il caso dipende dalle clip condivise.
 | 2 | Account 2, notebook B | CBraMod e TSception: solo passa-alto 4 Hz e solo passa-basso 30 Hz | Quale taglio spiega il −37.6 di CBraMod | Impronta della clip sotto 4 Hz (oculare/lenta) o sopra 30 Hz (EMG) |
 | 3 | Account 2, notebook B | CBraMod senza bordo frontale / temporale / 4 canali casuali | Quale metà del bordo spiega il −4.5 | Contributo oculare contro muscolare |
 | 4 | Account 1, notebook D (330 job, circa 2 sessioni) | TSception, DE, DE+z-score su `lnso10`, `lnso10_lco`, `lnso10_sizematched` (+ permutati); EMG facoltativo | Effetto minimo rilevabile su 123 soggetti; clip non viste contro il caso; scomposizione | Gate di potenza; generalizzazione reale a stimoli nuovi (+1.8 su split FM, al limite) |
+| 6 | Account 3, notebook E (33 job, circa 3 h) | EEGNet originale (Lawhern 2018) nel protocollo CBraMod; EEGNet con il framework di fine-tuning CBraMod; EEGNet originale + EA; leave-clip-out per le prime due + 2 permutati | BA su split FM contro 0.409 (CBraMod) e 0.229 (nostro); clip viste/non viste | Il divario con lo 0.409 dipende da finestra, ricetta o allineamento? Anche un EEGNet ben addestrato memorizza la clip? |
 | 5 | Da decidere dopo i punti 1–3 | CBraMod sui 10 fold | Se serve: su clip nuove è già al caso con margine netto | Robustezza del risultato centrale su 123 soggetti |
 
 **Facoltativi (💤 finché non servono):**
@@ -219,6 +220,16 @@ Anche per la valenza il vantaggio sopra il caso dipende dalle clip condivise.
 **Fuori perimetro:** altri dataset, REVE, Proposte 2–3, preprocessing dai raw.
 
 ---
+
+## 10b. Incidenti operativi (2026-11-25)
+
+- **Account 1, notebook D:** girava con un pacchetto di codice anteriore a `fe835b3`. Effetti:
+  - vecchia coda D, con CBraMod sui 10 fold;
+  - iperparametri TSception assenti → tutti i job TSception falliti subito.
+
+  Nessun dato corrotto: i job falliti non scrivono righe, e i CBraMod sui 10 fold completati sono validi.
+  Da riprendere con il codice aggiornato e l'output collegato.
+- **Account 2:** lanciato il notebook C, già completato dall'account 3 → senza l'output dell'account 3 ripete tutti gli 88 job. Da sostituire con il notebook B (36 job nuovi).
 
 ## 11. Messaggio principale emerso finora
 

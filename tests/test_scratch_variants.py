@@ -28,3 +28,23 @@ def test_lr_warmup_schedule():
         sched.step()
     lr30 = [g["lr"] for g in opt.param_groups]
     assert lr0[0] < 0.02 * hp["lr"] and abs(lr30[0] - hp["lr"]) / hp["lr"] < 0.05
+
+
+def test_eegnet_lawhern_max_norm_and_constant_lr():
+    import numpy as np
+    from pianob.train.loop import TrialBank, train_model
+    cfg = get_config("eegnet_lawhern")
+    m = build_model(cfg, 4, 400, 3, fs=100)
+    with torch.no_grad():
+        m.fc.weight.mul_(100)
+        m.block1[2].weight.mul_(100)
+    m.apply_constraints()
+    assert m.fc.weight.norm(dim=1).max() <= 0.25 + 1e-5
+    assert m.block1[2].weight.flatten(1).norm(dim=1).max() <= 1.0 + 1e-5
+    rng = np.random.default_rng(0)
+    data = rng.standard_normal((12, 4, 400)).astype(np.float32)
+    tr = TrialBank(data, np.repeat([0, 1, 2], 4), np.tile(np.arange(4), 3), np.arange(12) % 3, 400)
+    hp = {**TRAIN_DEFAULTS, **cfg.hparams, "epochs": 2, "amp": False}
+    r = train_model(m, hp, cfg.recipe, tr, tr, 3, "cpu", seed=0, log=lambda x: None)
+    assert r["status"] in ("completed", "early_stopped")
+    assert m.fc.weight.norm(dim=1).max() <= 0.25 + 1e-5      # vincolo mantenuto durante il training

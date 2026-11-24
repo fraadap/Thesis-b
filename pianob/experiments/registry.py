@@ -37,6 +37,25 @@ def _all() -> dict[str, ExpConfig]:
           hpo_study="eegnet_ea", tta_bnalpha=True),
         C("eegnet_noalign", "neural", "eegnet", window_s=4, overlap_train=0.5, align="none",
           hparams=dict(_EEGNET), hpo_study="eegnet_ea", notes="ablazione: EEGNet senza EA"),
+        # --- EEGNet con la metodologia originale (notebook E) -------------------------------------------------
+        # Lawhern et al. 2018: F1=8, D=2, F2=16, kernel temporale fs/2, separabile fs/8, dropout 0.25 (cross-
+        # soggetto), max-norm (1.0 sui filtri spaziali, 0.25 sul classificatore), Adam lr 1e-3 senza weight decay,
+        # batch 64, niente label smoothing né pesi di classe, molte epoche con il modello migliore in validation.
+        # Protocollo del benchmark CBraMod: finestre da 10 s a 200 Hz, scala /100, nessun allineamento.
+        C("eegnet_lawhern", "neural", "eegnet", window_s=10, align="none",
+          hparams={"F1": 8, "D": 2, "dropout": 0.25, "max_norm": True, "epochs": 200, "batch_size": 64,
+                   "lr": 1e-3, "weight_decay": 0.0, "label_smoothing": 0.0, "class_weighted": False,
+                   "scheduler": "constant", "clip_grad": 0.0, "select_metric": "ba_subject_mean", "patience": 50},
+          notes="EEGNet originale (Lawhern 2018) nel protocollo CBraMod"),
+        C("eegnet_lawhern_ea", "neural", "eegnet", window_s=10, align="ea",
+          hparams={"F1": 8, "D": 2, "dropout": 0.25, "max_norm": True, "epochs": 200, "batch_size": 64,
+                   "lr": 1e-3, "weight_decay": 0.0, "label_smoothing": 0.0, "class_weighted": False,
+                   "scheduler": "constant", "clip_grad": 0.0, "select_metric": "ba_subject_mean", "patience": 50},
+          notes="come eegnet_lawhern + allineamento EA per soggetto"),
+        C("eegnet_cbramod_recipe", "neural", "eegnet", window_s=10, align="none", recipe="cbramod_official",
+          hparams={**_CBRAMOD_OFFICIAL, "F1": 8, "D": 2, "dropout": 0.25, "max_norm": False},
+          notes="EEGNet addestrato con il framework di fine-tuning CBraMod (come le baseline del paper) "
+                "[DA VERIFICARE: la ricetta esatta delle baseline CBraMod non è nel repo]"),
         C("tsception_ea", "neural", "tsception", window_s=4, overlap_train=0.5, align="ea",
           channel_layout="hemispheric", hparams=dict(_TSC), hpo_study="tsception_ea", tta_bnalpha=True,
           notes="produce anche le righe tsception_ea_bnalpha (TTA a fine training)"),

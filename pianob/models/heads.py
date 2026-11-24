@@ -41,4 +41,4 @@ def build_model(cfg, n_channels: int, n_samples: int, n_classes: int, fs: int = 
 def EEGNet_(cfg, n_channels, n_samples, n_classes, fs):
     from .eegnet import EEGNet
     return EEGNet(n_channels, n_samples, n_classes, fs, F1=cfg.hp("F1", 8), D=cfg.hp("D", 2),
-                  dropout=cfg.hp("dropout", 0.5))
+                  dropout=cfg.hp("dropout", 0.5), max_norm=bool(cfg.hp("max_norm", False)))

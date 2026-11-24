@@ -333,8 +333,23 @@ def queue_nbD() -> list[Job]:
     return J
 
 
+def queue_nbE() -> list[Job]:
+    """EEGNet con la metodologia originale nel protocollo del benchmark CBraMod (account 3).
+    Domande: (1) il divario 0.229 (nostro EEGNet, 4 s + EA + nostra ricetta) contro 0.409 (EEGNet riportato da
+    CBraMod) viene da finestra, ricetta o allineamento? (2) anche EEGNet ben addestrato è memorizzazione della
+    clip (leave-clip-out)? Ordine: split FM (3 ricette x 3 seed) -> leave-clip-out -> permutati."""
+    J = []
+    J += train_jobs("eegnet_lawhern", ["split_fm"], CBRAMOD_SEEDS3)
+    J += train_jobs("eegnet_cbramod_recipe", ["split_fm"], CBRAMOD_SEEDS3)
+    J += train_jobs("eegnet_lawhern_ea", ["split_fm"], CBRAMOD_SEEDS3)
+    J += train_jobs("eegnet_lawhern", ["split_fm_lco"], CBRAMOD_SEEDS3)
+    J += train_jobs("eegnet_cbramod_recipe", ["split_fm_lco"], CBRAMOD_SEEDS3)
+    J += perm_jobs("eegnet_lawhern", "split_fm_lco", perms=range(2), seed=3407)
+    return J
+
+
 QUEUES = {"nb0_smoke": queue_nb0, "nbA_baselines_tsception": queue_nbA, "nbB_cbramod_gate": queue_nbB,
-          "nbC_cbramod_main": queue_nbC, "nbD_lnso10": queue_nbD}
+          "nbC_cbramod_main": queue_nbC, "nbD_lnso10": queue_nbD, "nbE_eegnet": queue_nbE}
 
 
 def main():
