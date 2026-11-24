@@ -169,7 +169,7 @@ H3 e H4 per ora valgono per TSception; per CBraMod servono i notebook C e D.
 
 ### Prossime run
 
-**Account 3, notebook C (CBraMod, 88 job, 2–3 sessioni)**, da lanciare ora.
+**Account 3, notebook C (CBraMod, 88 job)**, in corso, quasi terminato.
 
 | Blocco | Cosa verificare nei risultati | Risultato / ipotesi testata |
 |---|---|---|
@@ -192,9 +192,7 @@ H3 e H4 per ora valgono per TSception; per CBraMod servono i notebook C e D.
 
 Limite noto: gli iperparametri vengono da Optuna su split FM, che usa i soggetti 080–099 come validation. Nei fold 7–9 di `lnso10` quegli stessi soggetti sono di test, quindi la stima sui 10 fold è leggermente ottimistica. Rimedio facoltativo: tuning annidato per fold di TSception.
 
-**Account 2: libero.** Opzioni:
-- dividere con l'account 3 il notebook C (coda separata con controllo a parità di dati ed EMG di CBraMod);
-- poi CBraMod sui 10 fold, con la configurazione finale scelta dal notebook C.
+**Account 2: libero.** Il notebook C sta per finire sull'account 3 (decisione 2026-11-24: non si divide). Dopo i suoi risultati: CBraMod sui 10 fold con la configurazione finale scelta.
 
 | Blocco | Cosa verificare | Risultato / ipotesi testata |
 |---|---|---|
@@ -212,7 +210,7 @@ Limite noto: gli iperparametri vengono da Optuna su split FM, che usa i soggetti
 
 1. Account 3 → notebook C (risultato centrale: CBraMod su stimoli nuovi).
 2. Account 1 → notebook D (10 fold, gate di potenza).
-3. Account 2 → metà del notebook C oppure, dopo il notebook C, CBraMod sui 10 fold.
+3. Account 2 → dopo i risultati del notebook C, CBraMod sui 10 fold (coda da preparare).
 4. Gate 2 con `tools/aggregate.py` su tutti gli zip; poi stesura dei risultati.
 5. Sessione successiva: preprocessing dai raw, Proposte 2–3.
 
