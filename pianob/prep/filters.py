@@ -11,7 +11,10 @@ def bandpass(x: np.ndarray, band, fs: float, order: int = 4) -> np.ndarray:
     """Band-pass Butterworth zero-phase (sosfiltfilt) lungo l'ultimo asse, sull'intero trial
     (prima della finestratura, per evitare effetti di bordo per finestra)."""
     lo, hi = band
-    sos = butter(order, [lo, hi], btype="bandpass", fs=fs, output="sos")
+    if lo <= 0:      # solo passa-basso (es. [0, 30])
+        sos = butter(order, hi, btype="lowpass", fs=fs, output="sos")
+    else:
+        sos = butter(order, [lo, hi], btype="bandpass", fs=fs, output="sos")
     return sosfiltfilt(sos, x, axis=-1).astype(np.float32)
 
 
@@ -29,6 +32,16 @@ def channel_drop_set(spec: str | None) -> list[str]:
         return list(FM.EMG_EDGE_CHANNELS)
     if spec == "edge8_mastoids":
         return list(FM.EMG_EDGE_CHANNELS) + ["A1", "A2"]
+    if spec == "ocular4":     # bordo frontale: Fp1, Fp2, F7, F8 (più esposti ai residui oculari)
+        return ["FP1", "FP2", "F7", "F8"]
+    if spec == "temporal4":   # bordo temporale: FC5, FC6, T7, T8 (più esposti all'EMG dei temporali)
+        return ["FC5", "FC6", "T7", "T8"]
+    if spec.startswith("rand4_d"):   # controllo: 2 coppie simmetriche non di bordo
+        k = int(spec[len("rand4_d"):])
+        rng = np.random.default_rng(2_000 + k)
+        pool = FM.EMG_CONTROL_PAIR_POOL
+        pick = rng.choice(len(pool), size=2, replace=False)
+        return [ch for i in sorted(pick) for ch in pool[i]]
     if spec.startswith("rand8_d"):
         k = int(spec[len("rand8_d"):])
         rng = np.random.default_rng(1_000 + k)

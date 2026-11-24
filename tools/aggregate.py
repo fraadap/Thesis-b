@@ -118,6 +118,17 @@ def best_by_validation(jobs: list[dict], configs: list[str], protocol: str = "sp
     return max(sc, key=lambda c: np.mean(sc[c])) if sc else None
 
 
+def auto_best(df) -> str:
+    """Modello migliore pre-registrato: BA (finestra, media per soggetto) più alta su split_fm tra quelli che hanno
+    sia la scomposizione con permutazioni sia l'ablazione EMG."""
+    cands = {}
+    for c in df.config.unique():
+        dec = stim_decomposition(df, c, "split_fm")
+        if dec and "dstim_size_corr" in dec and delta_emg(df, c).get("bp4_30_rand8") is not None:
+            cands[c] = subj_series(df, c).mean()
+    return max(cands, key=cands.get) if cands else "tsception_ea"
+
+
 def primary_hypotheses(df, best: str, jobs: list[dict] | None = None) -> dict:
     res = {}
     # H1 (deviazione dichiarata): la ricetta esatta da zero collassa (classe costante, cfr. issue #22) e il
@@ -137,7 +148,7 @@ def primary_hypotheses(df, best: str, jobs: list[dict] | None = None) -> dict:
         c = np.array(dec["dstim_size_corr"]["per_subject"], float)
         c = c[~np.isnan(c)]
         res["H3_delta_stim_size_corr"] = {**paired_test(c, np.zeros_like(c)), "model": best}
-    e = delta_emg(df, best if best.startswith("tsception") else "tsception_ea")
+    e = delta_emg(df, best)
     if e and "bp4_30_rand8" in e and "bp4_30_noedge" in e:
         res["H4_emg_vs_controllo"] = paired_test(np.array(e["bp4_30_rand8"], float), np.array(e["bp4_30_noedge"], float))
     ps = {k: v["p"] for k, v in res.items() if "p" in v}
@@ -221,13 +232,17 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("inputs", nargs="+")
     ap.add_argument("--out", default="analysis")
-    ap.add_argument("--best", default="tsception_ea", help="modello per H3 (Δstim corretto)")
+    ap.add_argument("--best", default="auto", help="modello per H3/H4; 'auto' = BA più alta su split_fm tra i "
+                                                    "modelli neurali con scomposizione e ablazione EMG")
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     df, jobs, compact = load_inputs(a.inputs)
     if df.empty:
         sys.exit("nessun risultato negli input")
+    if a.best == "auto":
+        a.best = auto_best(df)
+        print(f"[H3/H4] modello migliore: {a.best}")
     s = summarize(main_view(df))
     s.to_csv(out / "tabella_principale.csv", index=False)
     md = ["# Risultati Piano B (FACED)\n", markdown_table(s, 1000), ""]

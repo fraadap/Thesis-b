@@ -94,7 +94,10 @@ def load_queue(path: Path) -> list[Job]:
 INVALIDATED = {
     **{f"tsception_ea__split_fm__f0__s{s}__emo9__bp4-30": {
         "cutoff": 1795348800,   # 2026-11-22 12:00 UTC
-        "reason": "cache 4-30 Hz con inf in float16 (campioni saturati filtrati): loss NaN"} for s in range(5)},
+        "reason": "cache 4-30 Hz con inf in float16 (campioni saturati filtrati): loss NaN"} for s in range(5)},    # CBraMod con EA / z-score: riscalatura all'RMS dei primi 5 soggetti, gonfiato dagli artefatti di sub003/004
+    **{jid: {"cutoff": 1795534842,
+             "reason": "riscalatura dopo EA/z-score dominata dagli artefatti: training bloccato al caso"}
+       for jid in ['cbramod_lora_r2_ea__split_fm__f0__s0__emo9__base', 'cbramod_lora_r2_ea__split_fm__f0__s1__emo9__base', 'cbramod_lora_r2_ea__split_fm__f0__s2__emo9__base', 'cbramod_lora_r2_ea__split_fm_lco__f0__s0__emo9__base', 'cbramod_lora_r2_ea__split_fm_lco__f0__s1__emo9__base', 'cbramod_lora_r2_ea__split_fm_lco__f0__s2__emo9__base', 'cbramod_lora_r2_ea__split_fm_lco__f1__s0__emo9__base', 'cbramod_lora_r2_ea__split_fm_lco__f1__s1__emo9__base', 'cbramod_lora_r2_ea__split_fm_lco__f1__s2__emo9__base', 'cbramod_lora_r2_ea__split_fm_lco__f2__s0__emo9__base', 'cbramod_lora_r2_ea__split_fm_lco__f2__s1__emo9__base', 'cbramod_lora_r2_ea__split_fm_lco__f2__s2__emo9__base', 'cbramod_lora_r2_zsub__split_fm__f0__s0__emo9__base', 'cbramod_lora_r2_zsub__split_fm__f0__s1__emo9__base', 'cbramod_lora_r2_zsub__split_fm__f0__s2__emo9__base']},
 }
 
 
@@ -276,6 +279,15 @@ def queue_nbB() -> list[Job]:
     # ricetta identica, il pre-addestrato con lo stesso warm-up
     J += [Job("train", "cbramod_scratch_ft_warmup", "split_fm", 0, s) for s in (1, 2)]
     J += train_jobs("cbramod_ft_official_warmup", ["split_fm"], CBRAMOD_SEEDS3)
+    # (2026-11-24) dopo il notebook C: (a) ripetizione di CBraMod con EA / z-score con la riscalatura robusta;
+    # (b) scomposizione della caduta a 4-30 Hz: solo passa-alto 4 Hz e solo passa-basso 30 Hz (3 seed)
+    J += train_jobs("cbramod_lora_r2_ea", ["split_fm", "split_fm_lco"], SEEDS3)
+    J += train_jobs("cbramod_lora_r2_zsub", ["split_fm"], SEEDS3)
+    J += [Job("train", "cbramod_lora_r2", "split_fm", 0, s, band=b) for b in ([4, 47], [0, 30]) for s in SEEDS3]
+    J += [Job("train", "tsception_ea", "split_fm", 0, s, band=b) for b in ([4, 47], [0, 30]) for s in SEEDS3]
+    # (c) bordo frontale/oculare contro temporale (CBraMod perde 4.5 punti senza i canali di bordo)
+    J += [Job("train", "cbramod_lora_r2", "split_fm", 0, s, drop=d) for d in ("ocular4", "temporal4") for s in SEEDS3]
+    J += [Job("train", "cbramod_lora_r2", "split_fm", 0, SEEDS3[k], drop=f"rand4_d{k}") for k in range(3)]
     return J
 
 

@@ -121,8 +121,16 @@ def _trial_meta(subjects, clips, clip_labels):
 
 
 def raw_rms(ctx: Context, jd: JobData, subjects, clips, band) -> float:
-    x = ctx.adapter.trials(subjects[:5], clips, channels=jd.channels, band=band)
-    return float(np.sqrt(np.mean(x.astype(np.float64) ** 2)))
+    """Scala di riferimento per riportare i dati allineati (EA/z-score) alla scala attesa da CBraMod.
+    Robusta agli artefatti: mediana, su fino a 20 soggetti di training equispaziati, della deviazione
+    standard mediana per canale. (Fino al 2026-11-24 era l'RMS dei primi 5 soggetti, gonfiato dagli
+    artefatti di sub003/sub004: le varianti EA/z-score di CBraMod non imparavano.)"""
+    sub = list(subjects)[::max(1, len(subjects) // 20)]
+    vals = []
+    for s in sub:
+        x = ctx.adapter.trials([s], clips, channels=jd.channels, band=band)[0].astype(np.float64)
+        vals.append(np.median(x.std(axis=(0, 2))))
+    return float(np.median(vals))
 
 
 # ------------------------------------------------------------------ righe dei risultati

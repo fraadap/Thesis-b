@@ -159,7 +159,37 @@ soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binari
 | 9 | 24/11 | 2 / B (diagnostica) | 11/11 | Da zero: impara solo con il warm-up delle LR (0.534). |
 | 10 | 24/11 | 2 / B (H1) | 16/16 | Da zero + warm-up 0.550 (3 seed); pre-addestrato + warm-up 0.521. **H1 (ricette scelte in validation): +0.008, p 0.21, n.s.** |
 
-**Ipotesi primarie con i dati attuali (Holm su 4):**
+| 11 | 24/11 | 3 / C (2 sessioni) | 88/88 | **CBraMod su clip non viste al caso**: ufficiale 0.111, LoRA 0.112 (viste 0.588 / 0.558). LoRA = ufficiale su split FM (0.558). Memorizzazione della clip 0.445 sopra il caso. EMG: 4–30 Hz −37.6 punti; senza bordo −4.5. **Varianti EA/z-score di CBraMod non valide** (riscalatura dominata dagli artefatti), invalidate e in ripetizione. |
+
+**Risultati del notebook C (2026-11-24), 23 soggetti, caso 0.111:**
+- **Clip non viste (risultato centrale):**
+  - CBraMod ricetta ufficiale: 0.111 (−0.0005, p 0.94; trial 0.114);
+  - CBraMod LoRA: 0.112 (p 0.94);
+  - clip viste: 0.588 e 0.558;
+  - CBraMod è **sotto** TSception sulle clip non viste (−1.9 punti, p 0.035).
+- **Indice appaiato (LoRA, 3 modelli permutati):** con label permutate le clip viste restano a 0.556 (contro 0.558) → memorizzazione 0.445 sopra il caso; guadagno specifico dell'emozione sulle viste +0.003; corretto +0.001 (n.s.).
+- **Scomposizione a parità di dati (LoRA, 3 seed + 2 permutati):** BA_full 0.555, BA_size 0.484, BA_unseen 0.112, BA_size^perm 0.461.
+  - Quantità di dati +7.1 punti (p 4e-5). È più grande che per TSception, probabilmente perché nel sottocampionamento ogni clip è vista da circa 2/3 dei soggetti e la memorizzazione ne risente.
+  - Δstim^size +37.2 punti.
+  - **Corretto +2.2 (IC95 da +0.8 a +3.7, p 0.008)**: con il sottocampionamento le label vere danno 2.3 punti in più di quelle permutate sulle clip T_k. Questo vantaggio **non si trasferisce** a clip nuove (BA_unseen = caso): sono feature condivise tra le clip di training della stessa categoria, non emozione generalizzabile.
+  - Differenza con l'indice appaiato: +2.1 (p 0.08).
+- **LoRA contro ufficiale:** identici su split FM (−0.001); sulle clip viste del leave-clip-out LoRA −3.0 (p 9e-5).
+- **EMG (LoRA, 3 seed):**
+  - piena 0.555;
+  - 4–30 Hz 0.179 (**−37.6**, tutti i soggetti peggiorano), con crollo uniforme su tutte le classi (fear da 0.72 a 0.16, sadness da 0.38 a 0.09…), non specifico di amusement/disgust;
+  - senza bordo 0.511 (−4.5, p 2e-5); senza 8 canali casuali −0.3 (n.s.);
+  - H4: 4–30 Hz senza casuali contro senza bordo **+2.0 (p 0.007)**.
+  - **Interpretazione aperta:** il crollo a 4–30 Hz può venire da < 4 Hz (residui oculari, potenziali lenti agganciati allo stimolo, cioè l'"impronta" della clip) o da > 30 Hz (EMG). Il bordo comprende Fp1/Fp2 (oculari). In coda sul notebook B: solo passa-alto 4 Hz, solo passa-basso 30 Hz, bordo frontale contro temporale.
+- **Sonda della clip (embedding medio da 200 dimensioni):** accuratezza 8.4% (caso 3.6%), BA dalla clip 0.156 contro modello 0.555. La media su canali e patch perde l'identità che la testa da 64 000 dimensioni usa: la sonda sottostima. È un limite.
+- **CBraMod con EA / z-score: non validi.** In 13 job su 15 la loss resta a 2.22 (caso). Causa probabile: la riscalatura all'RMS dei primi 5 soggetti include sub003/sub004 (artefatti fino a 87 000 µV) e gonfia la scala degli ingressi. Corretto con una scala robusta (mediana delle deviazioni standard per canale su 20 soggetti); job invalidati (`INVALIDATED`) e ripetuti sul notebook B.
+
+**Ipotesi primarie con i dati attuali (Holm su 4).** H3 e H4 sono sul modello migliore pre-registrato, CBraMod LoRA (`--best auto`):
+- H1 pretraining: +0.008, p Holm 0.21, n.s.;
+- H2 allineamento (TSception): +0.084, p Holm 2e-6, confermata;
+- **H3 Δstim^size corretto > 0 (CBraMod): +0.022, p Holm 0.022, confermata in senso stretto**, ma il vantaggio non si trasferisce a stimoli nuovi (BA_unseen al caso). Con TSception: −0.019;
+- **H4 EMG oltre il controllo (CBraMod): +0.020, p Holm 0.022, confermata**, ma con il bordo che include i canali oculari e il crollo a 4–30 Hz da attribuire (verifiche in coda). Con TSception: n.s.
+
+**Ipotesi primarie aggiornate al 2026-11-23 (prima del notebook C):**
 - H1 pretraining: +0.008 (p Holm 0.42), n.s.;
 - H2 allineamento: +0.084 (p Holm 2e-6), confermata;
 - H3 Δstim^size corretto > 0: −0.019 (p Holm 0.049), segno opposto, cioè vantaggio interamente compatibile con memorizzazione della clip;
@@ -169,7 +199,15 @@ H3 e H4 per ora valgono per TSception; per CBraMod servono i notebook C e D.
 
 ### Prossime run
 
-**Account 3, notebook C (CBraMod, 88 job)**, in corso, quasi terminato.
+**Account 3, notebook C (CBraMod, 88 job)**: completato il 2026-11-24 (vedi sessione 11).
+
+**Account 2, notebook B (aggiunte del 2026-11-24, 36 job, circa 7 h)**
+
+| Blocco | Cosa verificare | Ipotesi testata |
+|---|---|---|
+| CBraMod LoRA con EA (split FM + LCO, 3 seed) e con z-score (3 seed), riscalatura robusta | La loss scende sotto 2.2? BA contro LoRA senza allineamento | L'allineamento aiuta anche un foundation model? (H2 esteso) |
+| CBraMod LoRA e TSception: solo passa-alto 4 Hz, solo passa-basso 30 Hz (3 seed) | Quale dei due spiega il crollo a 4–30 Hz (0.555 → 0.179)? | L'impronta della clip sta sotto 4 Hz (oculare/lenta) o sopra 30 Hz (EMG)? |
+| CBraMod LoRA senza bordo frontale (Fp1, Fp2, F7, F8) / temporale (FC5, FC6, T7, T8) / 4 canali casuali | Quale metà del bordo spiega i −4.5 punti? | Il contributo del bordo è oculare o muscolare? |
 
 | Blocco | Cosa verificare nei risultati | Risultato / ipotesi testata |
 |---|---|---|

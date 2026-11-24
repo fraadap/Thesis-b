@@ -86,6 +86,13 @@ def delta_emg(df: pd.DataFrame, config: str, protocol: str = "split_fm", metric:
         "bp4_30_noedge": d.variant == "bp4-30_noedge",
         "rand8": d.variant.str.fullmatch(r"rand8d\d+"),
         "bp4_30_rand8": d.variant.str.fullmatch(r"bp4-30_rand8d\d+"),
+        # scomposizione della banda: solo passa-alto 4 Hz (toglie < 4 Hz) / solo passa-basso 30 Hz (toglie > 30 Hz)
+        "bp4_47": d.variant == "bp4-47",
+        "bp0_30": d.variant == "bp0-30",
+        # scomposizione del bordo: frontale/oculare contro temporale, con controllo a 4 canali casuali
+        "ocular4": d.variant == "ocular4",
+        "temporal4": d.variant == "temporal4",
+        "rand4": d.variant.str.fullmatch(r"rand4d\d+"),
     }.items():
         s = sm(mask)
         if s is not None:
