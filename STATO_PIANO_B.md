@@ -163,6 +163,7 @@ soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binari
 
 | 11 | 24/11 | 3 / C (2 sessioni) | 88/88 | **CBraMod su clip non viste al caso**: ufficiale 0.111, LoRA 0.112 (viste 0.588 / 0.558). LoRA = ufficiale su split FM (0.558). Memorizzazione della clip 0.445 sopra il caso. EMG: 4–30 Hz −37.6 punti; senza bordo −4.5. **Varianti EA/z-score di CBraMod non valide** (riscalatura dominata dagli artefatti), invalidate e in ripetizione. |
 | 12 | 24/11 | 2 / C (ripetizione, con l'output dell'account 3) | 15/15 | **Allineamento su CBraMod ripetuto con la scala robusta: ora impara in tutti i 15 job, ma non aiuta.** EA 0.397 (−16.0, tutti i 23 soggetti peggiorano); z-score 0.540 (−1.7, p 0.048). Clip non viste con EA 0.123 (+1.2 sul caso, p 0.07, n.s.). |
+| 13 | 24/11 | 3 / E | 33/33 | **EEGNet originale (Lawhern 2018, finestre da 10 s) + EA: 0.455**, il doppio del nostro EEGNet+EA (0.229) e sopra lo 0.409 riportato da CBraMod. Senza EA 0.257; con il framework di fine-tuning CBraMod 0.222. Senza EA, clip non viste 0.118 (n.s.). |
 
 **Risultati del notebook C (2026-11-24), 23 soggetti, caso 0.111:**
 - **Clip non viste (risultato centrale):**
@@ -192,6 +193,25 @@ soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binari
 - **z-score per soggetto: 0.540 (−1.7, p 0.048, peggiorano 17 soggetti su 23).**
 - Leave-clip-out con EA: viste 0.450, non viste 0.123 (+1.2 sul caso, p 0.07, n.s.; il segnale viene quasi tutto dal fold 0: 0.14 contro 0.12 e 0.11). Rispetto a LoRA senza allineamento sulle non viste: +1.1, p 0.11, n.s.
 - **Lettura:** l'allineamento che regge i modelli compatti (+8.4 TSception, +9.8 EEGNet) danneggia il foundation model. EA ruota e mescola i canali: le patch non hanno più la statistica spaziale e spettrale vista nel pre-training, e la testa all_patch_reps lavora canale per canale. Lo z-score toglie solo la scala per canale e costa poco. L'eterogeneità tra soggetti, che EA compensa nei modelli compatti, CBraMod la assorbe già nella rappresentazione. Nessuna delle due varianti cambia il risultato centrale: sulle clip nuove si resta intorno al caso.
+**Notebook E: EEGNet con la metodologia originale (sessione 13, 3 seed, 23 soggetti):**
+
+| Config | Finestra | Allineamento | Ricetta | Split FM | Viste / non viste (leave-clip-out) |
+|---|---|---|---|---|---|
+| EEGNet nostro (Optuna) | 4 s | EA | nostra | 0.229 | 0.260 / 0.121 |
+| EEGNet nostro | 4 s | nessuno | nostra | 0.131 | — |
+| EEGNet originale | 10 s | nessuno | Lawhern | 0.257 | 0.242 / 0.118 |
+| EEGNet, framework CBraMod | 10 s | nessuno | fine-tuning CBraMod | 0.222 | 0.219 / 0.119 |
+| **EEGNet originale + EA** | 10 s | EA | Lawhern | **0.455** | ⏳ |
+| CBraMod LoRA | 10 s | nessuno | — | 0.557 | 0.558 / 0.112 |
+
+- **Il divario con lo 0.409 non era della ricetta CBraMod:** quella ricetta dà 0.222, meno della ricetta di Lawhern (0.257, +3.6, p 5e-6). Senza allineamento non arriviamo a 0.409; con EA lo superiamo.
+- **EA vale +19.8 punti** su EEGNet originale (tutti i soggetti migliorano, p 2e-7), contro i +9.8 del nostro EEGNet. Su CBraMod invece costa 16 punti.
+- **EEGNet originale + EA contro il nostro EEGNet+EA: +22.6 (p 2e-7).** Contro TSception+EA: +24.3. Il nostro Optuna cercava finestre solo tra 2, 4 e 6 s (TSception) o 2 e 4 s (EEGNet): **le baseline compatte del benchmark erano sotto-ottimizzate.** Il divario CBraMod − miglior modello compatto scende da circa 34 a **10 punti** (LoRA +10.1, p 5e-7; ricetta ufficiale +10.3, p 3e-5).
+- **Il training da 200 epoche non è arrivato a convergenza:** 2 seed su 3 hanno la validation migliore all'ultima epoca (199 e 191).
+- **Clip non viste, senza EA:** EEGNet originale 0.118 (+0.7, p 0.27), framework CBraMod 0.119 (+0.8, p 0.22). Divario viste/non viste 12.4 punti.
+- **Indice appaiato (EEGNet originale, 2 modelli permutati):** clip viste con label permutate 0.200 contro 0.242 vere → memorizzazione +8.9 sopra il caso (p 3e-5); guadagno specifico dell'emozione sulle viste +4.2; corretto +3.5 (p 3e-4). È lo stesso schema di CBraMod: un vantaggio emotivo reale sulle clip viste che sulle clip nuove non si vede.
+- **Domanda aperta:** lo 0.455 con EA regge su clip nuove? Se sì, è il primo modello che generalizza agli stimoli; se no, l'EA amplifica la memorizzazione. In coda sul notebook E (36 job aggiunti).
+
 - Correzione al riepilogo: il JSON compatto poteva riportare i test di permutazione dei job invalidati (i record per job non avevano l'orario). Ora ogni record ha l'orario e i vecchi lo prendono dal file `done`; le tabelle per soggetto erano già corrette.
 
 **Ipotesi primarie con i dati attuali (Holm su 4).** H3 e H4 sono sul modello migliore pre-registrato, CBraMod LoRA (`--best auto`):
@@ -239,6 +259,15 @@ H3 e H4 per ora valgono per TSception; per CBraMod servono i notebook C e D.
 | (opz., in fondo) EMG: 4–30 Hz senza bordo e senza 8 canali casuali (2 estrazioni), 1 seed | ΔEMG contro controllo, con 123 soggetti | H4 con piena potenza: l'effetto minimo rilevabile scende da 1.5 a circa 0.6 punti. |
 
 Limite noto: gli iperparametri vengono da Optuna su split FM, che usa i soggetti 080–099 come validation. Nei fold 7–9 di `lnso10` quegli stessi soggetti sono di test, quindi la stima sui 10 fold è leggermente ottimistica. Rimedio facoltativo: tuning annidato per fold di TSception.
+
+**Account 3, notebook E (ripresa, 36 job aggiunti, circa 6 h).** Ricostruire lo zip del codice e allegare in input l'output della prima sessione: i 33 job fatti vengono saltati.
+
+| Blocco | Cosa verificare | Ipotesi testata |
+|---|---|---|
+| EEGNet originale + EA su leave-clip-out (3 seed) + 2 permutati per fold | BA sulle clip non viste contro il caso; indice appaiato corretto | Lo 0.455 è emozione che si trasferisce o memorizzazione della clip amplificata dall'EA? |
+| EEGNet originale + EA a parità di dati (3 seed + 2 permutati) | Scomposizione dati / stimolo; Δstim^size corretto | H3 sul miglior modello compatto |
+| EEGNet originale + EA con finestre da 4 s | BA contro 0.455 (10 s) e 0.229 (nostra ricetta, 4 s) | Il salto viene dalla finestra o dalla ricetta? |
+| EEGNet originale + EA, 400 epoche | BA contro 0.455 | Quanto si perde a 200 epoche? |
 
 **Account 2: libero.** Il notebook C sta per finire sull'account 3 (decisione 2026-11-24: non si divide). Dopo i suoi risultati: CBraMod sui 10 fold con la configurazione finale scelta.
 

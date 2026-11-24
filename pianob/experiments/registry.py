@@ -19,6 +19,10 @@ _LORA = {
 }
 _TSC = {"epochs": 50, "batch_size": 64, "lr": 1e-3, "weight_decay": 1e-2, "dropout": 0.5, "num_T": 15,
         "num_S": 15, "hidden": 32, "label_smoothing": 0.1, "patience": 10}
+# Lawhern et al. 2018 (vedi le config eegnet_lawhern*)
+_LAWHERN = {"F1": 8, "D": 2, "dropout": 0.25, "max_norm": True, "epochs": 200, "batch_size": 64, "lr": 1e-3,
+            "weight_decay": 0.0, "label_smoothing": 0.0, "class_weighted": False, "scheduler": "constant",
+            "clip_grad": 0.0, "select_metric": "ba_subject_mean", "patience": 50}
 _EEGNET = {"epochs": 50, "batch_size": 64, "lr": 1e-3, "weight_decay": 1e-3, "dropout": 0.5, "F1": 8, "D": 2,
            "label_smoothing": 0.1, "patience": 10}
 
@@ -42,16 +46,16 @@ def _all() -> dict[str, ExpConfig]:
         # soggetto), max-norm (1.0 sui filtri spaziali, 0.25 sul classificatore), Adam lr 1e-3 senza weight decay,
         # batch 64, niente label smoothing né pesi di classe, molte epoche con il modello migliore in validation.
         # Protocollo del benchmark CBraMod: finestre da 10 s a 200 Hz, scala /100, nessun allineamento.
-        C("eegnet_lawhern", "neural", "eegnet", window_s=10, align="none",
-          hparams={"F1": 8, "D": 2, "dropout": 0.25, "max_norm": True, "epochs": 200, "batch_size": 64,
-                   "lr": 1e-3, "weight_decay": 0.0, "label_smoothing": 0.0, "class_weighted": False,
-                   "scheduler": "constant", "clip_grad": 0.0, "select_metric": "ba_subject_mean", "patience": 50},
+        C("eegnet_lawhern", "neural", "eegnet", window_s=10, align="none", hparams=dict(_LAWHERN),
           notes="EEGNet originale (Lawhern 2018) nel protocollo CBraMod"),
-        C("eegnet_lawhern_ea", "neural", "eegnet", window_s=10, align="ea",
-          hparams={"F1": 8, "D": 2, "dropout": 0.25, "max_norm": True, "epochs": 200, "batch_size": 64,
-                   "lr": 1e-3, "weight_decay": 0.0, "label_smoothing": 0.0, "class_weighted": False,
-                   "scheduler": "constant", "clip_grad": 0.0, "select_metric": "ba_subject_mean", "patience": 50},
+        C("eegnet_lawhern_ea", "neural", "eegnet", window_s=10, align="ea", hparams=dict(_LAWHERN),
           notes="come eegnet_lawhern + allineamento EA per soggetto"),
+        # Verifiche dopo il notebook E (0.455): una modifica alla volta rispetto a eegnet_lawhern_ea.
+        C("eegnet_lawhern_ea_w4", "neural", "eegnet", window_s=4, align="ea", hparams=dict(_LAWHERN),
+          notes="finestre da 4 s (come eegnet_ea): il salto 0.229 -> 0.455 viene dalla finestra o dalla ricetta?"),
+        C("eegnet_lawhern_ea_long", "neural", "eegnet", window_s=10, align="ea",
+          hparams={**_LAWHERN, "epochs": 400},
+          notes="400 epoche: con 200 la validation di 2 seed su 3 migliora ancora all'ultima epoca"),
         C("eegnet_cbramod_recipe", "neural", "eegnet", window_s=10, align="none", recipe="cbramod_official",
           hparams={**_CBRAMOD_OFFICIAL, "F1": 8, "D": 2, "dropout": 0.25, "max_norm": False},
           notes="EEGNet addestrato con il framework di fine-tuning CBraMod (come le baseline del paper) "

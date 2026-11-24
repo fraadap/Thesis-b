@@ -345,6 +345,16 @@ def queue_nbE() -> list[Job]:
     J += train_jobs("eegnet_lawhern", ["split_fm_lco"], CBRAMOD_SEEDS3)
     J += train_jobs("eegnet_cbramod_recipe", ["split_fm_lco"], CBRAMOD_SEEDS3)
     J += perm_jobs("eegnet_lawhern", "split_fm_lco", perms=range(2), seed=3407)
+    # Aggiunte dopo la prima sessione (2026-11-24): EEGNet originale + EA arriva a 0.455 su split FM.
+    # (a) regge su clip nuove? leave-clip-out + 2 modelli permutati per fold (indice appaiato corretto)
+    J += train_jobs("eegnet_lawhern_ea", ["split_fm_lco"], CBRAMOD_SEEDS3)
+    J += perm_jobs("eegnet_lawhern_ea", "split_fm_lco", perms=range(2), seed=3407)
+    # (b) scomposizione dati / stimolo a parità di quantità di dati (H3 per il miglior modello compatto)
+    J += sizematched_jobs("eegnet_lawhern_ea", CBRAMOD_SEEDS3, draws=[0], n_perm_models=2)
+    # (c) da dove viene il salto da 0.229 a 0.455: finestra da 4 s con la stessa ricetta
+    J += train_jobs("eegnet_lawhern_ea_w4", ["split_fm"], CBRAMOD_SEEDS3)
+    # (d) training più lungo (la validation migliorava ancora a 200 epoche)
+    J += train_jobs("eegnet_lawhern_ea_long", ["split_fm"], CBRAMOD_SEEDS3)
     return J
 
 

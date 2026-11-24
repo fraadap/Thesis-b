@@ -62,7 +62,8 @@ Aggiornata il 2026-11-24, dopo il notebook C. Fonte dei numeri: `tools/aggregate
 | Log-power + LR | baseline minima | 0.200 | ✅ |
 | DE + asimmetrie + LR | FACED paper: 35.2% (protocollo e metrica diversi) | 0.185 | non confrontabile direttamente |
 | DE + z-score per soggetto | — | 0.232 | ✅ |
-| EEGNet + EA | 0.409 (EEGNet riprodotto da CBraMod) | **0.229** | ❗ divario non spiegato; facoltativo: EEGNet con la ricetta CBraMod |
+| EEGNet + EA (nostra ricetta, 4 s) | 0.409 (EEGNet riprodotto da CBraMod) | **0.229** | 🔀 sotto-ottimizzato (finestre di Optuna ≤ 6 s) |
+| 🆕 EEGNet originale (Lawhern, 10 s), senza EA / framework CBraMod / + EA | 0.409 | 0.257 / 0.222 / **0.455** | 🆕 con EA supera lo 0.409; ⏳ 400 epoche |
 | TSception + EA | "competitivo" con i foundation model | **0.212** | molto sotto CBraMod sulle clip condivise |
 | CBraMod, ricetta ufficiale | 0.5509 | **0.558** (trial 0.751) | ✅ Gate 1 |
 | CBraMod LoRA | variante efficiente | 0.558 | ✅ uguale al full fine-tuning |
@@ -94,6 +95,7 @@ Deviazione 🔀: la scelta della testa (ufficiale contro leggera) è stata aggiu
 | Stime dei tempi 2–3 volte troppo alte | Micro-benchmark | 🔀 Stime dai minuti effettivi dei job già completati | Risolto |
 | CBraMod con EA / z-score fermo al caso (13/15 job) | — | 🆕 Riscalatura resa robusta (prima era dominata dagli artefatti di sub003/004); job invalidati e ripetuti | ✅ ora impara; EA −16.0, z-score −1.7 |
 | CBraMod perde 37.6 punti a 4–30 Hz in modo uniforme su tutte le classi | Ablazione EMG = 4–30 Hz + bordo | 🆕 Scomposizione: solo passa-alto 4 Hz, solo passa-basso 30 Hz, bordo frontale contro temporale | ⏳ |
+| EEGNet originale + EA a 0.455 contro 0.229 del nostro | Baseline compatte con iperparametri da Optuna | 🆕 Lo spazio di Optuna limitava le finestre a 2–6 s: le baseline compatte erano sotto-ottimizzate. Il miglior compatto ora è EEGNet originale + EA; il divario con CBraMod scende da 34 a 10 punti | ⏳ verifica su clip nuove e con finestre da 4 s |
 | Il primo blocco di valenza era solo su clip condivise | Valenza come task secondario su split FM | 🆕 Valenza anche su leave-clip-out e a parità di dati | ✅ |
 | Perimetro | 5 dataset previsti in prospettiva | 🔀 Solo FACED e CBraMod; gli altri sono un'espansione futura | decisione |
 
@@ -111,6 +113,9 @@ Atteso, da Xu & Plataniotis (encoder contrastivi): calo da 2.2 a 44.4 punti, cor
 | DE | 0.196 | 0.120 | 7.6 | +0.9 (n.s.) | 7.6 | 0.0 |
 | DE + z-score | 0.270 | 0.145 | 12.5 | +3.4 (p 0.006) | 13.0 | −0.5 |
 | EEGNet + EA | 0.260 | 0.121 | 13.9 | +1.0 (n.s.) | — | — |
+| 🆕 EEGNet originale (10 s, senza EA) | 0.242 | 0.118 | 12.4 | +0.7 (n.s.) | 8.9 | **+3.5 (p 3e-4)** |
+| 🆕 EEGNet, framework CBraMod | 0.219 | 0.119 | 10.0 | +0.8 (n.s.) | — | — |
+| 🆕 EEGNet originale + EA | ⏳ | ⏳ | | | | |
 | TSception + EA | 0.247 | 0.130 | 11.7 | +1.8 (p 0.01) | 14.2 | −2.5 |
 | **CBraMod, ricetta ufficiale** | 0.588 | **0.111** | **47.8** | −0.05 (p 0.94) | — | — |
 | **CBraMod LoRA** | 0.558 | **0.112** | **44.6** | +0.1 (p 0.94) | **44.5** | +0.1 |
@@ -205,12 +210,12 @@ Anche per la valenza il vantaggio sopra il caso dipende dalle clip condivise.
 | 2 | Account 2, notebook B (21 job; in input gli output di B e C) | CBraMod e TSception: solo passa-alto 4 Hz e solo passa-basso 30 Hz | Quale taglio spiega il −37.6 di CBraMod | Impronta della clip sotto 4 Hz (oculare/lenta) o sopra 30 Hz (EMG) |
 | 3 | Account 2, notebook B | CBraMod senza bordo frontale / temporale / 4 canali casuali | Quale metà del bordo spiega il −4.5 | Contributo oculare contro muscolare |
 | 4 | Account 1, notebook D (330 job, circa 2 sessioni) | TSception, DE, DE+z-score su `lnso10`, `lnso10_lco`, `lnso10_sizematched` (+ permutati); EMG facoltativo | Effetto minimo rilevabile su 123 soggetti; clip non viste contro il caso; scomposizione | Gate di potenza; generalizzazione reale a stimoli nuovi (+1.8 su split FM, al limite) |
-| 6 | Account 3, notebook E (33 job, circa 3 h) | EEGNet originale (Lawhern 2018) nel protocollo CBraMod; EEGNet con il framework di fine-tuning CBraMod; EEGNet originale + EA; leave-clip-out per le prime due + 2 permutati | BA su split FM contro 0.409 (CBraMod) e 0.229 (nostro); clip viste/non viste | Il divario con lo 0.409 dipende da finestra, ricetta o allineamento? Anche un EEGNet ben addestrato memorizza la clip? |
+| 6 | ✅ Fatto (account 3, notebook E, 33 job) | EEGNet originale, framework CBraMod, originale + EA | 0.257 / 0.222 / **0.455**; clip non viste al caso senza EA | Il divario con lo 0.409 viene da finestra e allineamento, non dalla ricetta CBraMod |
+| 7 | Account 3, notebook E ripreso (36 job, circa 6 h; in input l'output della prima sessione) | EEGNet originale + EA: leave-clip-out + 2 permutati, a parità di dati + 2 permutati, finestre da 4 s, 400 epoche | Clip non viste contro il caso; scomposizione; effetto della finestra | **Il miglior modello compatto (0.455) generalizza a stimoli nuovi?** H3 sul compatto |
 | 5 | Da decidere dopo i punti 1–3 | CBraMod sui 10 fold | Se serve: su clip nuove è già al caso con margine netto | Robustezza del risultato centrale su 123 soggetti |
 
 **Facoltativi (💤 finché non servono):**
-- EEGNet con la ricetta CBraMod: divario 0.229 contro 0.409;
-- EEGNet nel controllo a parità di dati;
+- TSception con finestre da 10 s + EA (stessa sotto-ottimizzazione di EEGNet);
 - clipping robusto degli artefatti;
 - tuning annidato per fold: ottimismo della stima sui 10 fold, dovuto al tuning su sub080–099;
 - arousal binario dai self-report: servono i raw.
