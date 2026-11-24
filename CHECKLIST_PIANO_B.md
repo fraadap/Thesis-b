@@ -64,7 +64,7 @@ Aggiornata il 2026-11-24, dopo il notebook C. Fonte dei numeri: `tools/aggregate
 | DE + z-score per soggetto | — | 0.232 | ✅ |
 | EEGNet + EA (nostra ricetta, 4 s) | 0.409 (EEGNet riprodotto da CBraMod) | **0.229** | 🔀 sotto-ottimizzato (finestre di Optuna ≤ 6 s) |
 | 🆕 EEGNet originale (Lawhern, 10 s), senza EA / framework CBraMod / + EA | 0.409 | 0.257 / 0.222 / **0.455** | 🆕 con EA supera lo 0.409; ⏳ 400 epoche |
-| TSception + EA | "competitivo" con i foundation model | **0.212** | molto sotto CBraMod sulle clip condivise |
+| TSception + EA | "competitivo" con i foundation model | **0.212** | 🔀 probabilmente sotto-ottimizzato (finestre ≤ 6 s); ⏳ TSception originale da 10 s con e senza EA |
 | CBraMod, ricetta ufficiale | 0.5509 | **0.558** (trial 0.751) | ✅ Gate 1 |
 | CBraMod LoRA | variante efficiente | 0.558 | ✅ uguale al full fine-tuning |
 | CBraMod da zero, ricetta ufficiale | "con cautela" (issue #22); paper 0.523 | **0.111 (collasso)** | 🔀 vedi §5 |
@@ -211,11 +211,10 @@ Anche per la valenza il vantaggio sopra il caso dipende dalle clip condivise.
 | 3 | Account 2, notebook B | CBraMod senza bordo frontale / temporale / 4 canali casuali | Quale metà del bordo spiega il −4.5 | Contributo oculare contro muscolare |
 | 4 | Account 1, notebook D (330 job, circa 2 sessioni) | TSception, DE, DE+z-score su `lnso10`, `lnso10_lco`, `lnso10_sizematched` (+ permutati); EMG facoltativo | Effetto minimo rilevabile su 123 soggetti; clip non viste contro il caso; scomposizione | Gate di potenza; generalizzazione reale a stimoli nuovi (+1.8 su split FM, al limite) |
 | 6 | ✅ Fatto (account 3, notebook E, 33 job) | EEGNet originale, framework CBraMod, originale + EA | 0.257 / 0.222 / **0.455**; clip non viste al caso senza EA | Il divario con lo 0.409 viene da finestra e allineamento, non dalla ricetta CBraMod |
-| 7 | Account 3, notebook E ripreso (36 job, circa 6 h; in input l'output della prima sessione) | EEGNet originale + EA: leave-clip-out + 2 permutati, a parità di dati + 2 permutati, finestre da 4 s, 400 epoche | Clip non viste contro il caso; scomposizione; effetto della finestra | **Il miglior modello compatto (0.455) generalizza a stimoli nuovi?** H3 sul compatto |
+| 7 | Account 3, notebook E ripreso (57 job, circa 9 h; in input l'output della prima sessione) | EEGNet originale + EA: leave-clip-out + 2 permutati, a parità di dati + 2 permutati, finestre da 4 s, 400 epoche. TSception originale (Ding 2022, 10 s) con e senza EA su split FM; con EA anche su leave-clip-out + 2 permutati | Clip non viste contro il caso; scomposizione; effetto della finestra | **Il miglior modello compatto (0.455) generalizza a stimoli nuovi?** H3 sul compatto |
 | 5 | Da decidere dopo i punti 1–3 | CBraMod sui 10 fold | Se serve: su clip nuove è già al caso con margine netto | Robustezza del risultato centrale su 123 soggetti |
 
 **Facoltativi (💤 finché non servono):**
-- TSception con finestre da 10 s + EA (stessa sotto-ottimizzazione di EEGNet);
 - clipping robusto degli artefatti;
 - tuning annidato per fold: ottimismo della stima sui 10 fold, dovuto al tuning su sub080–099;
 - arousal binario dai self-report: servono i raw.

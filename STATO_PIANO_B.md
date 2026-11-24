@@ -260,11 +260,13 @@ H3 e H4 per ora valgono per TSception; per CBraMod servono i notebook C e D.
 
 Limite noto: gli iperparametri vengono da Optuna su split FM, che usa i soggetti 080–099 come validation. Nei fold 7–9 di `lnso10` quegli stessi soggetti sono di test, quindi la stima sui 10 fold è leggermente ottimistica. Rimedio facoltativo: tuning annidato per fold di TSception.
 
-**Account 3, notebook E (ripresa, 36 job aggiunti, circa 6 h).** Ricostruire lo zip del codice e allegare in input l'output della prima sessione: i 33 job fatti vengono saltati.
+**Account 3, notebook E (ripresa, 57 job aggiunti, circa 9 h; può servire una seconda sessione).** Ricostruire lo zip del codice e allegare in input l'output della prima sessione: i 33 job fatti vengono saltati.
 
 | Blocco | Cosa verificare | Ipotesi testata |
 |---|---|---|
 | EEGNet originale + EA su leave-clip-out (3 seed) + 2 permutati per fold | BA sulle clip non viste contro il caso; indice appaiato corretto | Lo 0.455 è emozione che si trasferisce o memorizzazione della clip amplificata dall'EA? |
+| TSception con la metodologia originale (Ding 2022), finestre da 10 s, con e senza EA (3 seed) | BA contro 0.212 (nostro TSception, Optuna, 6 s) e contro EEGNet originale + EA | Anche TSception era sotto-ottimizzato? |
+| TSception originale + EA su leave-clip-out (3 seed) + 2 permutati per fold | Clip non viste contro il caso | Il compatto migliorato generalizza a stimoli nuovi? |
 | EEGNet originale + EA a parità di dati (3 seed + 2 permutati) | Scomposizione dati / stimolo; Δstim^size corretto | H3 sul miglior modello compatto |
 | EEGNet originale + EA con finestre da 4 s | BA contro 0.455 (10 s) e 0.229 (nostra ricetta, 4 s) | Il salto viene dalla finestra o dalla ricetta? |
 | EEGNet originale + EA, 400 epoche | BA contro 0.455 | Quanto si perde a 200 epoche? |

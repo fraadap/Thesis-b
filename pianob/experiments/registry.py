@@ -23,6 +23,13 @@ _TSC = {"epochs": 50, "batch_size": 64, "lr": 1e-3, "weight_decay": 1e-2, "dropo
 _LAWHERN = {"F1": 8, "D": 2, "dropout": 0.25, "max_norm": True, "epochs": 200, "batch_size": 64, "lr": 1e-3,
             "weight_decay": 0.0, "label_smoothing": 0.0, "class_weighted": False, "scheduler": "constant",
             "clip_grad": 0.0, "select_metric": "ba_subject_mean", "patience": 50}
+# TSception con la metodologia originale (Ding et al., IEEE TAC 2022; repo deepBrains/TSception): num_T = num_S = 15,
+# hidden 32, dropout 0.5, Adam lr 1e-3 senza weight decay, batch 64, label smoothing 0.1, LR costante, molte
+# epoche con early stopping in validation. [DA VERIFICARE sul repo: numero massimo di epoche, patience e smoothing.]
+# Stesso budget di EEGNet originale (200 epoche, patience 50) per confrontarli alla pari.
+_TSC_DING = {"num_T": 15, "num_S": 15, "hidden": 32, "dropout": 0.5, "epochs": 200, "batch_size": 64, "lr": 1e-3,
+             "weight_decay": 0.0, "label_smoothing": 0.1, "class_weighted": False, "scheduler": "constant",
+             "clip_grad": 0.0, "select_metric": "ba_subject_mean", "patience": 50}
 _EEGNET = {"epochs": 50, "batch_size": 64, "lr": 1e-3, "weight_decay": 1e-3, "dropout": 0.5, "F1": 8, "D": 2,
            "label_smoothing": 0.1, "patience": 10}
 
@@ -66,6 +73,11 @@ def _all() -> dict[str, ExpConfig]:
         C("tsception_noalign", "neural", "tsception", window_s=4, overlap_train=0.5, align="none",
           channel_layout="hemispheric", hparams=dict(_TSC), hpo_study="tsception_ea",
           notes="ablazione: TSception senza EA"),
+        # --- TSception con la metodologia originale nel protocollo CBraMod (finestre da 10 s), notebook E -----------
+        C("tsception_ding", "neural", "tsception", window_s=10, align="none", channel_layout="hemispheric",
+          hparams=dict(_TSC_DING), notes="TSception originale (Ding 2022) nel protocollo CBraMod"),
+        C("tsception_ding_ea", "neural", "tsception", window_s=10, align="ea", channel_layout="hemispheric",
+          hparams=dict(_TSC_DING), notes="come tsception_ding + allineamento EA per soggetto"),
         C("cbramod_ft_official", "neural", "cbramod", window_s=10, pretrained=True, recipe="cbramod_official",
           hparams=dict(_CBRAMOD_OFFICIAL), notes="Gate 1: ricetta ufficiale, full fine-tuning"),
         C("cbramod_scratch_ft", "neural", "cbramod", window_s=10, pretrained=False, recipe="cbramod_official",
