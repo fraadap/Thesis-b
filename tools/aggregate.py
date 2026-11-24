@@ -108,18 +108,27 @@ def paired(df, a, b, **kw):
     return paired_test(sa[idx].values, sb[idx].values)
 
 
-def primary_hypotheses(df, best: str) -> dict:
+def best_by_validation(jobs: list[dict], configs: list[str], protocol: str = "split_fm") -> str | None:
+    """Config con la migliore metrica di selezione media in validation (solo job base, task emo9)."""
+    sc = {}
+    for j in jobs:
+        if j.get("config") in configs and f"__{protocol}__" in j["job_id"] and j["job_id"].endswith("__emo9__base") \
+                and "val_best" in j:
+            sc.setdefault(j["config"], []).append(j["val_best"])
+    return max(sc, key=lambda c: np.mean(sc[c])) if sc else None
+
+
+def primary_hypotheses(df, best: str, jobs: list[dict] | None = None) -> dict:
     res = {}
-    # H1: la ricetta esatta da zero collassa (classe costante, cfr. issue #22). Deviazione dichiarata:
-    # confronto a ricetta identica con warm-up delle LR; in mancanza, pre-addestrato ufficiale vs da zero con
-    # warm-up; il confronto con il collasso resta solo come riferimento.
-    for a_, b_ in (("cbramod_ft_official_warmup", "cbramod_scratch_ft_warmup"),
-                   ("cbramod_ft_official", "cbramod_scratch_ft_warmup"),
-                   ("cbramod_ft_official", "cbramod_scratch_ft")):
-        r = paired(df, a_, b_)
-        if r:
-            res["H1_pretraining"] = {**r, "pair": f"{a_} vs {b_}"}
-            break
+    # H1 (deviazione dichiarata): la ricetta esatta da zero collassa (classe costante, cfr. issue #22) e il
+    # warm-up delle LR peggiora il pre-addestrato. Per ciascun modello si usa la ricetta con la migliore
+    # metrica di selezione media in VALIDATION (mai il test); senza i record dei job: ufficiale vs warm-up.
+    pre = best_by_validation(jobs or [], ["cbramod_ft_official", "cbramod_ft_official_warmup"]) or "cbramod_ft_official"
+    scr = best_by_validation(jobs or [], ["cbramod_scratch_ft", "cbramod_scratch_ft_warmup",
+                                          "cbramod_scratch_ft_definit_warmup"]) or "cbramod_scratch_ft_warmup"
+    r = paired(df, pre, scr)
+    if r:
+        res["H1_pretraining"] = {**r, "pair": f"{pre} vs {scr} (ricette scelte in validation)"}
     r = paired(df, "tsception_ea", "tsception_noalign")
     if r:
         res["H2_allineamento"] = r
@@ -225,7 +234,7 @@ def main():
     g1 = gate1(jobs) if jobs else next((c.get("gate1") for c in compact if c.get("gate1")), {})
     md.append(f"**Gate 1**: {g1}\n")
     md.append("## Ipotesi primarie (Holm sulla famiglia di 4)\n")
-    prim = primary_hypotheses(df, a.best)
+    prim = primary_hypotheses(df, a.best, jobs)
     for k, v in prim.items():
         md.append(f"- **{k}**: diff media {v['mean_diff']:.4f}, mediana {v['median_diff']:.4f}, dz {v.get('dz', np.nan):.2f}, "
                   f"IC95 {np.round(v.get('ci95', [np.nan, np.nan]), 4).tolist()}, peggiorati {v.get('frac_worse', np.nan):.2f}, "

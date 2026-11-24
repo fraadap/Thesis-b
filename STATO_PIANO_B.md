@@ -119,7 +119,24 @@ Coda: 178/208 job; **completata (208/208) con la ripresa del 2026-11-23**.
   - La causa del collasso è la learning rate piena dalla prima iterazione, non l'inizializzazione.
   - Il valore 0.534 è coerente con quello del paper senza pretraining (circa 0.523).
   - **Deviazione dichiarata per H1:** confronto a ricetta identica, pre-addestrato con warm-up contro da zero con warm-up (3 seed ciascuno, in coda sul notebook B). In mancanza, pre-addestrato ufficiale contro da zero con warm-up. Il confronto con il collasso resta solo come riferimento.
-  - Stima preliminare (3 seed contro 1): +0.023 (p 0.018, p Holm 0.049; peggiora il 26% dei soggetti). Il pretraining aiuta poco, come nel paper (+2.8).
+  - Stima preliminare (3 seed contro 1): +0.023. **Superata dai risultati completi qui sotto.**
+- **H1 completo (2026-11-24, 3 seed per braccio, BA media per soggetto su split FM):**
+
+  | Modello | BA finestra | BA trial | κ val (selezione) |
+  |---|---|---|---|
+  | Pre-addestrato, ricetta ufficiale | 0.558 | 0.751 | 0.562 |
+  | Pre-addestrato + warm-up | 0.521 | 0.725 | 0.526 |
+  | Da zero + warm-up | 0.550 | 0.734 | 0.528 |
+  | Da zero, ricetta ufficiale | 0.111 (collasso) | – | 0.000 |
+
+  - Il warm-up **peggiora** il pre-addestrato: −0.037, p 8e-6, peggiora il 91% dei soggetti. Con il warm-up il fine-tuning si ferma prima (epoche migliori 20–31 contro 19–31). Il "confronto a ricetta identica" penalizzerebbe quindi il pre-addestrato (−0.029, p 0.007), così come la ricetta ufficiale penalizza il da-zero (collasso).
+  - **Regola adottata per H1:** per ciascun modello la ricetta con la migliore metrica di selezione in validation (mai il test). Pre-addestrato → ufficiale; da zero → warm-up. Implementata in `tools/aggregate.py`.
+  - **H1: +0.008 (IC95 da −0.006 a +0.022, p 0.21, p Holm 0.42).** Il pretraining non dà un vantaggio significativo su FACED quando il training da zero è stabile. Il +2.8 del paper dipende probabilmente dalla ricetta usata per il da-zero. La sensibilità alla ricetta (±3–4 punti) supera l'effetto del pretraining.
+  - Famiglia primaria (Holm, 4 ipotesi):
+    - H1 pretraining n.s. (p Holm 0.42);
+    - H2 allineamento confermata (p Holm 2e-6);
+    - H3 Δstim^size corretto: segno opposto (−0.019, p Holm 0.049);
+    - H4 EMG n.s. (p Holm 0.42).
 - **Optuna CBraMod con LoRA completato:** 13 trial completi + 18 potati. Migliore BA di validation 0.600 con rango 4, lr testa 8.2e-4, lr LoRA 3.1e-4, dropout LoRA 0.27, label smoothing 0.2, warm-up della testa 3 epoche, testa ufficiale. Salvato in `pianob/hpo/best/cbramod_lora_r2.json`: il notebook C lo trova senza collegare l'output del notebook B.
 
 ## Checklist delle run (aggiornata il 2026-11-23)
@@ -138,7 +155,7 @@ Legenda: [x] fatto · [ ] da fare · (opz.) facoltativo.
 - [x] Init casuale, stessa ricetta, 3 seed → collasso (vedi sopra).
 - [x] Optuna CBraMod con LoRA, 30 trial (31 finiti in una sessione).
 - [x] Diagnostica dell'init casuale: impara solo con il warm-up delle LR.
-- [ ] **H1 a ricetta identica:** da zero con warm-up (seed 1 e 2) + pre-addestrato con warm-up (3 seed). 5 job, circa 1.5 h.
+- [x] H1: da zero con warm-up (3 seed) e pre-addestrato con warm-up (3 seed) completati. H1 n.s. con le ricette scelte in validation.
 - (opz.) Optuna sulla ricetta ufficiale (lr e `multi_lr`, 10 trial) se il Gate 1 non passa per poco.
 
 **Account 3 (notebook C)**, 88 job, circa 2–3 sessioni. **Può partire ora**: Gate 1 passato, iperparametri LoRA nel codice.
