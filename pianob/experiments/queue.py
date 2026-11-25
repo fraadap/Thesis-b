@@ -288,6 +288,12 @@ def queue_nbB() -> list[Job]:
     # (c) bordo frontale/oculare contro temporale (CBraMod perde 4.5 punti senza i canali di bordo)
     J += [Job("train", "cbramod_lora_r2", "split_fm", 0, s, drop=d) for d in ("ocular4", "temporal4") for s in SEEDS3]
     J += [Job("train", "cbramod_lora_r2", "split_fm", 0, SEEDS3[k], drop=f"rand4_d{k}") for k in range(3)]
+    # (2026-11-25) esito: il crollo viene tutto da sotto 4 Hz (passa-alto 4 Hz -38 punti, passa-basso 30 Hz +1).
+    # (d) leave-clip-out con passa-alto 4 Hz: tolto il contenuto lento, sulle clip nuove cambia qualcosa?
+    J += train_jobs("cbramod_lora_r2", ["split_fm_lco"], SEEDS3, band=[4, 47])
+    # (e) dove sta l'informazione sotto 4 Hz: solo 0-4 Hz; passa-alto 1 Hz e 2 Hz
+    J += [Job("train", "cbramod_lora_r2", "split_fm", 0, s, band=b) for b in ([0, 4], [1, 47], [2, 47])
+          for s in SEEDS3]
     return J
 
 
@@ -361,6 +367,12 @@ def queue_nbE() -> list[Job]:
     J += train_jobs("eegnet_lawhern_ea_w4", ["split_fm"], CBRAMOD_SEEDS3)
     # (f) training più lungo (la validation migliorava ancora a 200 epoche)
     J += train_jobs("eegnet_lawhern_ea_long", ["split_fm"], CBRAMOD_SEEDS3)
+    # (2026-11-25) per CBraMod l'informazione sta sotto 4 Hz; finestre da 10 s valgono +19 punti per EEGNet.
+    # (g) EEGNet originale + EA usa lo stesso contenuto lento? passa-alto 4 Hz e solo 0-4 Hz (3 seed)
+    J += [Job("train", "eegnet_lawhern_ea", "split_fm", 0, s, band=b) for b in ([4, 47], [0, 4])
+          for s in CBRAMOD_SEEDS3]
+    # (h) leave-clip-out con passa-alto 4 Hz
+    J += train_jobs("eegnet_lawhern_ea", ["split_fm_lco"], CBRAMOD_SEEDS3, band=[4, 47])
     return J
 
 

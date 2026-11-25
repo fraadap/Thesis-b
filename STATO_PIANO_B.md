@@ -164,6 +164,8 @@ soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binari
 | 11 | 24/11 | 3 / C (2 sessioni) | 88/88 | **CBraMod su clip non viste al caso**: ufficiale 0.111, LoRA 0.112 (viste 0.588 / 0.558). LoRA = ufficiale su split FM (0.558). Memorizzazione della clip 0.445 sopra il caso. EMG: 4–30 Hz −37.6 punti; senza bordo −4.5. **Varianti EA/z-score di CBraMod non valide** (riscalatura dominata dagli artefatti), invalidate e in ripetizione. |
 | 12 | 24/11 | 2 / C (ripetizione, con l'output dell'account 3) | 15/15 | **Allineamento su CBraMod ripetuto con la scala robusta: ora impara in tutti i 15 job, ma non aiuta.** EA 0.397 (−16.0, tutti i 23 soggetti peggiorano); z-score 0.540 (−1.7, p 0.048). Clip non viste con EA 0.123 (+1.2 sul caso, p 0.07, n.s.). |
 | 13 | 24/11 | 3 / E | 33/33 | **EEGNet originale (Lawhern 2018, finestre da 10 s) + EA: 0.455**, il doppio del nostro EEGNet+EA (0.229) e sopra lo 0.409 riportato da CBraMod. Senza EA 0.257; con il framework di fine-tuning CBraMod 0.222. Senza EA, clip non viste 0.118 (n.s.). |
+| 14 | 24–25/11 | 2 / B (ripresa) | 21/21 | **Il crollo di CBraMod viene tutto da sotto 4 Hz**: passa-alto 4 Hz 0.177 (−38.0), passa-basso 30 Hz 0.567 (+1.0, n.s.). Non è EMG. Bordo frontale −1.0, temporale −1.5, casuali −0.1. |
+| 15 | 24–25/11 | 3 / E (ripresa) | 57/57 | **EEGNet originale + EA su clip nuove: 0.115 (al caso)**, viste 0.513, memorizzazione 38.0. Finestre da 4 s 0.264: il salto viene dalla finestra. 400 epoche: nessun cambiamento. TSception originale: 0.214 con EA (= nostro), clip nuove **0.143 (+3.2, p 0.001)**. |
 
 **Risultati del notebook C (2026-11-24), 23 soggetti, caso 0.111:**
 - **Clip non viste (risultato centrale):**
@@ -211,6 +213,14 @@ soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binari
 - **Clip non viste, senza EA:** EEGNet originale 0.118 (+0.7, p 0.27), framework CBraMod 0.119 (+0.8, p 0.22). Divario viste/non viste 12.4 punti.
 - **Indice appaiato (EEGNet originale, 2 modelli permutati):** clip viste con label permutate 0.200 contro 0.242 vere → memorizzazione +8.9 sopra il caso (p 3e-5); guadagno specifico dell'emozione sulle viste +4.2; corretto +3.5 (p 3e-4). È lo stesso schema di CBraMod: un vantaggio emotivo reale sulle clip viste che sulle clip nuove non si vede.
 - **Domanda aperta:** lo 0.455 con EA regge su clip nuove? Se sì, è il primo modello che generalizza agli stimoli; se no, l'EA amplifica la memorizzazione. In coda sul notebook E (36 job aggiunti).
+
+**Notebook E ripreso (sessione 15) e notebook B ripreso (sessione 14), 3 seed, 23 soggetti:**
+- **EEGNet originale + EA non generalizza:** leave-clip-out viste 0.513, non viste 0.115 (+0.4, p 0.32). Con label permutate le viste restano a 0.491 → memorizzazione 38.0 punti; corretto +1.8 (p 0.04). A parità di dati: quantità di dati +3.4, Δstim^size corretto +1.1 (n.s.).
+- **Il salto da 0.229 a 0.455 viene dalla finestra:** stessa ricetta con finestre da 4 s 0.264 (−19.1, tutti i soggetti peggiorano); la ricetta di Lawhern vale +3.5 sul nostro EEGNet a 4 s. 400 epoche: 0.455, identico.
+- **TSception originale (Ding 2022, 10 s):** senza EA 0.138 (un seed collassa al caso); con EA 0.214, uguale al nostro TSception (0.212). Su clip nuove **0.143, +3.2 sul caso (p 0.001)**, meglio del nostro TSception (+1.3, p 0.02). Viste 0.234, permutate viste 0.231: il divario viste/non viste è memorizzazione (corretto −2.9).
+- **Bande, CBraMod LoRA:** solo passa-alto 4 Hz 0.177 (−38.0, come 4–30 Hz); solo passa-basso 30 Hz 0.567 (+1.0, n.s.). **Tutta l'informazione sta sotto 4 Hz; sopra 30 Hz (EMG) non serve.** TSception: −1.7 e +1.4, entrambi n.s.
+- **Bordo, CBraMod LoRA:** frontale (Fp1, Fp2, F7, F8) −1.0 (n.s.), temporale (FC5, FC6, T7, T8) −1.5 (p 0.005), 4 canali casuali −0.1. Nessun contributo oculare specifico; i −4.5 senza bordo sono la somma di due effetti piccoli.
+- **Lettura d'insieme:** più un modello è accurato sulle clip condivise, meno generalizza a quelle nuove (CBraMod 0.557 → 0.112; EEGNet+EA 0.455 → 0.115; TSception 0.214 → 0.143; DE+z-score 0.232 → 0.145). L'accuratezza alta viene dal contenuto lento (sotto 4 Hz, visibile in finestre lunghe) che identifica la clip. È un'ipotesi da verificare: code aggiunte sotto.
 
 - Correzione al riepilogo: il JSON compatto poteva riportare i test di permutazione dei job invalidati (i record per job non avevano l'orario). Ora ogni record ha l'orario e i vecchi lo prendono dal file `done`; le tabelle per soggetto erano già corrette.
 
@@ -260,7 +270,15 @@ H3 e H4 per ora valgono per TSception; per CBraMod servono i notebook C e D.
 
 Limite noto: gli iperparametri vengono da Optuna su split FM, che usa i soggetti 080–099 come validation. Nei fold 7–9 di `lnso10` quegli stessi soggetti sono di test, quindi la stima sui 10 fold è leggermente ottimistica. Rimedio facoltativo: tuning annidato per fold di TSception.
 
-**Account 3, notebook E (ripresa, 57 job aggiunti, circa 9 h; può servire una seconda sessione).** Ricostruire lo zip del codice e allegare in input l'output della prima sessione: i 33 job fatti vengono saltati.
+**Aggiunte del 2026-11-25 (dopo le sessioni 14 e 15).** Ricostruire lo zip del codice; in input l'output dell'ultima sessione dello stesso notebook.
+
+| Dove | Blocco | Cosa verificare | Ipotesi testata |
+|---|---|---|---|
+| Account 2, notebook B (18 job, circa 3.5 h) | CBraMod LoRA su leave-clip-out a 4–47 Hz (3 seed) | Clip non viste contro il caso, viste contro 0.558 | Tolta l'impronta lenta della clip, emerge una generalizzazione? |
+| Account 2, notebook B | CBraMod LoRA con solo 0–4 Hz, passa-alto 1 Hz e 2 Hz (3 seed) | BA con solo la banda lenta; dove cade la soglia | Quanta accuratezza sta in 0–4 Hz, e in quale parte |
+| Account 3, notebook E (15 job, circa 2 h) | EEGNet originale + EA a 4–47 Hz e 0–4 Hz (3 seed); leave-clip-out a 4–47 Hz (3 seed) | BA contro 0.455; clip non viste | Il +19 delle finestre da 10 s è la stessa impronta lenta? |
+
+**Account 3, notebook E (ripresa, 57 job aggiunti, circa 9 h): completato (sessione 15).** Ricostruire lo zip del codice e allegare in input l'output della prima sessione: i 33 job fatti vengono saltati.
 
 | Blocco | Cosa verificare | Ipotesi testata |
 |---|---|---|

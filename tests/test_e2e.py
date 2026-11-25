@@ -74,3 +74,13 @@ def test_synthetic_trials_shape_and_channels():
     x = ad.trials([0, 5], [0, 27])
     assert x.shape == (2, 2, 32, 6000) and x.dtype == np.float32
     assert ad.channel_indices(["T3", "T4"]) == ad.channel_indices(["T7", "T8"])
+
+
+def test_band_filter_on_leave_clip_out(ctx, tmp_path):
+    """Code del 2026-11-25: leave-clip-out con passa-alto 4 Hz e solo 0-4 Hz (EEGNet originale + EA)."""
+    for band in ([4, 47], [0, 4]):
+        job = Job("train", "eegnet_lawhern_ea", "split_fm_lco", 0, 0, band=band,
+                  overrides={"max_subjects": 2, "hparams": {"epochs": 1, "patience": 0}})
+        assert run_job(job, ctx) == "completed"
+    variants = {(r["variant"], r["test_condition"]) for r in _rows(tmp_path)}
+    assert {("bp4-47", "unseen"), ("bp0-4", "seen")} <= variants
