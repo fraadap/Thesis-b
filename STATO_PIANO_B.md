@@ -166,6 +166,7 @@ soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binari
 | 13 | 24/11 | 3 / E | 33/33 | **EEGNet originale (Lawhern 2018, finestre da 10 s) + EA: 0.455**, il doppio del nostro EEGNet+EA (0.229) e sopra lo 0.409 riportato da CBraMod. Senza EA 0.257; con il framework di fine-tuning CBraMod 0.222. Senza EA, clip non viste 0.118 (n.s.). |
 | 14 | 24–25/11 | 2 / B (ripresa) | 21/21 | **Il crollo di CBraMod viene tutto da sotto 4 Hz**: passa-alto 4 Hz 0.177 (−38.0), passa-basso 30 Hz 0.567 (+1.0, n.s.). Non è EMG. Bordo frontale −1.0, temporale −1.5, casuali −0.1. |
 | 15 | 24–25/11 | 3 / E (ripresa) | 57/57 | **EEGNet originale + EA su clip nuove: 0.115 (al caso)**, viste 0.513, memorizzazione 38.0. Finestre da 4 s 0.264: il salto viene dalla finestra. 400 epoche: nessun cambiamento. TSception originale: 0.214 con EA (= nostro), clip nuove **0.143 (+3.2, p 0.001)**. |
+| 16 | 25/11 | 2 / E (ripresa) | 15/15 | **EEGNet+EA con solo 0–4 Hz: 0.450 (= banda piena 0.455)**; con 4–47 Hz 0.273 (−18.3, come le finestre da 4 s). Leave-clip-out a 4–47 Hz: clip nuove **0.136 (+2.5 sul caso, p 0.007; +2.1 sulla banda piena, p 0.03)**. |
 
 **Risultati del notebook C (2026-11-24), 23 soggetti, caso 0.111:**
 - **Clip non viste (risultato centrale):**
@@ -221,6 +222,12 @@ soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binari
 - **Bande, CBraMod LoRA:** solo passa-alto 4 Hz 0.177 (−38.0, come 4–30 Hz); solo passa-basso 30 Hz 0.567 (+1.0, n.s.). **Tutta l'informazione sta sotto 4 Hz; sopra 30 Hz (EMG) non serve.** TSception: −1.7 e +1.4, entrambi n.s.
 - **Bordo, CBraMod LoRA:** frontale (Fp1, Fp2, F7, F8) −1.0 (n.s.), temporale (FC5, FC6, T7, T8) −1.5 (p 0.005), 4 canali casuali −0.1. Nessun contributo oculare specifico; i −4.5 senza bordo sono la somma di due effetti piccoli.
 - **Lettura d'insieme:** più un modello è accurato sulle clip condivise, meno generalizza a quelle nuove (CBraMod 0.557 → 0.112; EEGNet+EA 0.455 → 0.115; TSception 0.214 → 0.143; DE+z-score 0.232 → 0.145). L'accuratezza alta viene dal contenuto lento (sotto 4 Hz, visibile in finestre lunghe) che identifica la clip. È un'ipotesi da verificare: code aggiunte sotto.
+
+**Notebook E, bande (sessione 16, EEGNet originale + EA, 3 seed):**
+- Solo 0–4 Hz: 0.450 contro 0.455 a banda piena (n.s.). Tutta l'accuratezza sulle clip condivise sta sotto 4 Hz, come per CBraMod.
+- Solo 4–47 Hz: 0.273 (−18.3, peggiorano 22 soggetti su 23), uguale alle finestre da 4 s (0.264, differenza n.s.). **Il vantaggio delle finestre lunghe è proprio il contenuto lento.**
+- Leave-clip-out a 4–47 Hz: viste 0.322, **non viste 0.136 (+2.5 sul caso, p 0.007)**, contro 0.115 a banda piena (+2.1, p 0.03). Tolta l'impronta lenta della clip, la generalizzazione a clip nuove compare, piccola, al livello dei modelli compatti (TSception 0.130, differenza n.s.).
+- Resta un divario viste/non viste di 18.6 punti: in coda 2 modelli permutati per fold a 4–47 Hz per dire quanto è ancora memorizzazione.
 
 - Correzione al riepilogo: il JSON compatto poteva riportare i test di permutazione dei job invalidati (i record per job non avevano l'orario). Ora ogni record ha l'orario e i vecchi lo prendono dal file `done`; le tabelle per soggetto erano già corrette.
 

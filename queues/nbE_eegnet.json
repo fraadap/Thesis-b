@@ -2143,5 +2143,143 @@
   "depends_on": [],
   "est_min": 0.0,
   "job_id": "eegnet_lawhern_ea__split_fm_lco__f2__s2__emo9__bp4-47"
+ },
+ {
+  "kind": "train",
+  "config": "eegnet_lawhern_ea",
+  "protocol": "split_fm_lco",
+  "fold": 0,
+  "seed": 3407,
+  "task": "emo9",
+  "band": [
+   4,
+   47
+  ],
+  "drop": null,
+  "perm": 0,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {},
+  "depends_on": [],
+  "est_min": 0.0,
+  "job_id": "eegnet_lawhern_ea__split_fm_lco__f0__s3407__emo9__bp4-47_perm0"
+ },
+ {
+  "kind": "train",
+  "config": "eegnet_lawhern_ea",
+  "protocol": "split_fm_lco",
+  "fold": 1,
+  "seed": 3407,
+  "task": "emo9",
+  "band": [
+   4,
+   47
+  ],
+  "drop": null,
+  "perm": 0,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {},
+  "depends_on": [],
+  "est_min": 0.0,
+  "job_id": "eegnet_lawhern_ea__split_fm_lco__f1__s3407__emo9__bp4-47_perm0"
+ },
+ {
+  "kind": "train",
+  "config": "eegnet_lawhern_ea",
+  "protocol": "split_fm_lco",
+  "fold": 2,
+  "seed": 3407,
+  "task": "emo9",
+  "band": [
+   4,
+   47
+  ],
+  "drop": null,
+  "perm": 0,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {},
+  "depends_on": [],
+  "est_min": 0.0,
+  "job_id": "eegnet_lawhern_ea__split_fm_lco__f2__s3407__emo9__bp4-47_perm0"
+ },
+ {
+  "kind": "train",
+  "config": "eegnet_lawhern_ea",
+  "protocol": "split_fm_lco",
+  "fold": 0,
+  "seed": 3407,
+  "task": "emo9",
+  "band": [
+   4,
+   47
+  ],
+  "drop": null,
+  "perm": 1,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {},
+  "depends_on": [],
+  "est_min": 0.0,
+  "job_id": "eegnet_lawhern_ea__split_fm_lco__f0__s3407__emo9__bp4-47_perm1"
+ },
+ {
+  "kind": "train",
+  "config": "eegnet_lawhern_ea",
+  "protocol": "split_fm_lco",
+  "fold": 1,
+  "seed": 3407,
+  "task": "emo9",
+  "band": [
+   4,
+   47
+  ],
+  "drop": null,
+  "perm": 1,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {},
+  "depends_on": [],
+  "est_min": 0.0,
+  "job_id": "eegnet_lawhern_ea__split_fm_lco__f1__s3407__emo9__bp4-47_perm1"
+ },
+ {
+  "kind": "train",
+  "config": "eegnet_lawhern_ea",
+  "protocol": "split_fm_lco",
+  "fold": 2,
+  "seed": 3407,
+  "task": "emo9",
+  "band": [
+   4,
+   47
+  ],
+  "drop": null,
+  "perm": 1,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {},
+  "depends_on": [],
+  "est_min": 0.0,
+  "job_id": "eegnet_lawhern_ea__split_fm_lco__f2__s3407__emo9__bp4-47_perm1"
  }
 ]

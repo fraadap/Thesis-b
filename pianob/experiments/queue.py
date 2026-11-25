@@ -373,6 +373,10 @@ def queue_nbE() -> list[Job]:
           for s in CBRAMOD_SEEDS3]
     # (h) leave-clip-out con passa-alto 4 Hz
     J += train_jobs("eegnet_lawhern_ea", ["split_fm_lco"], CBRAMOD_SEEDS3, band=[4, 47])
+    # (2026-11-25) esito: a 4-47 Hz le clip nuove salgono a 0.136 (+2.5 sul caso). (i) 2 modelli permutati per fold
+    # a 4-47 Hz: il divario viste/non viste che resta (18.6 punti) è ancora memorizzazione?
+    J += [Job("train", "eegnet_lawhern_ea", "split_fm_lco", f, 3407, perm=k, band=[4, 47])
+          for k in range(2) for f in _folds("split_fm_lco")]
     return J
 
 
