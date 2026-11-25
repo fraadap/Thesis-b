@@ -36,6 +36,7 @@ def run_queue(queue: str, gpus: str = "auto", synthetic: bool = False, skip_benc
     code_root = Path(__file__).resolve().parents[1]
     qpath = code_root / "queues" / f"{queue}.json"
     assert qpath.exists(), f"coda non trovata: {qpath}"
+    check_queue_hpo(qpath)
     cmd = [sys.executable, "-u", "-m", "pianob.run", "--queue", str(qpath), "--gpus", gpus]
     if synthetic:
         cmd.append("--synthetic")
@@ -112,6 +113,25 @@ def weights_check() -> None:
         want = json.loads(exp.read_text()).get("sha256")
         print(f"  checksum atteso {want[:16]}..., trovato {m.pretrained_info['sha256'][:16]}... -> "
               f"{'OK' if want == m.pretrained_info['sha256'] else 'DIVERSO!'}")
+
+
+def check_queue_hpo(qpath) -> None:
+    """Con PIANOB_REQUIRE_HPO=1 controlla PRIMA di partire che ogni config della coda trovi i suoi iperparametri
+    Optuna: altrimenti si ferma subito, invece di far fallire i job uno a uno per tutta la sessione."""
+    if os.environ.get("PIANOB_REQUIRE_HPO") != "1":
+        return
+    from .experiments.queue import load_queue
+    from .experiments.registry import find_hpo_best, get_config
+    jobs = load_queue(qpath)
+    produced = {j.config for j in jobs if j.kind == "hpo"}   # studi Optuna eseguiti dalla coda stessa
+    studies = {get_config(j.config).hpo_study for j in jobs if j.kind == "train"} - {None, ""} - produced
+    missing = sorted(s for s in studies if find_hpo_best(s) is None)
+    banner("Iperparametri Optuna richiesti dalla coda")
+    for st in sorted(studies):
+        print(f"  {st}: {'MANCANTE' if st in missing else find_hpo_best(st)}")
+    if missing:
+        raise RuntimeError(f"iperparametri Optuna mancanti: {missing}. Lo zip del codice è aggiornato? "
+                           "Ricostruiscilo con tools/make_zips.py --code-only")
 
 
 def require_hpo(study: str) -> bool:
