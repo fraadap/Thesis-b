@@ -292,8 +292,19 @@ def main():
         for k, v in probes.items():
             md.append(f"- {k}: accuratezza clip {v['clip_acc']:.3f} (caso {v['clip_chance']:.3f}), "
                       f"BA da clip->categoria {v['ba_from_clip']:.3f}")
+    tm = {j["job_id"]: j["clip_probe_token_mean"] for j in jobs if "clip_probe_token_mean" in j}
+    for k, v in tm.items():
+        md.append(f"- {k} (media dei token): accuratezza clip {v['clip_acc']:.3f} (caso {v['clip_chance']:.3f}), "
+                  f"BA da clip->categoria {v['ba_from_clip']:.3f}")
+    # Sessione 02: seconda famiglia, pretraining su clip non viste, REVE contro CBraMod, Gate R, tempi
+    from pianob.eval import session02
+    from pianob.report import gate_r, timing
+    gr = gate_r(jobs) if jobs else next((c.get("gate_r") for c in compact if c.get("gate_r")), None)
+    tmg = timing(jobs) if jobs else next((c.get("timing") for c in compact if c.get("timing")), None)
+    md += session02.markdown(df, jobs, gr, tmg)
+    second = session02.second_family(df, jobs)
     (out / "risultati.md").write_text("\n".join(md) + "\n")
-    json.dump({"primary": prim}, open(out / "ipotesi_primarie.json", "w"), indent=1, default=str)
+    json.dump({"primary": prim, "second_family": second}, open(out / "ipotesi_primarie.json", "w"), indent=1, default=str)
     plots(df, out)
     print("\n".join(md))
     print(f"\n-> {out}/risultati.md, tabella_principale.csv, grafici PNG")

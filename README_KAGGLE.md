@@ -111,6 +111,12 @@ Pagina del Dataset `pianob-code` → *New Version* → carica il nuovo `pianob_c
 | `nbB_cbramod_gate.ipynb` | Account 2 | CBraMod con la ricetta ufficiale (**Gate 1**), CBraMod da zero, Optuna di CBraMod LoRA |
 | `nbC_cbramod_main.ipynb` | Account 3 | Solo **dopo il Gate 1** e con l'Optuna di LoRA disponibile: CBraMod su leave-clip-out, EA, EMG, sonda, permutazioni |
 | `nbD_lnso10.ipynb` | a rotazione | 10 fold sui soggetti per le config finali |
+| `nbE_eegnet.ipynb` | a rotazione | EEGNet e TSception con la metodologia originale, bande |
+| `nbF_ricetta_pretraining.ipynb` | Sessione 02 | Optuna della ricetta a due fasi di CBraMod, controllo di sanità, CBraMod a due fasi (pre-addestrato e da zero), pretraining sulle clip non viste. Coda `F` (circa 1-2 sessioni) |
+| `nbG_reve.ipynb` | Sessione 02, account dedicato | REVE-Base: Gate R poi tutti i protocolli di CBraMod. Coda `G` (2-3 sessioni). **Internet ON** e Secret `HF_TOKEN` (sezione C2) |
+
+La coda `F_bis` (ablazione della testa) è solo preparata: non c'è un notebook. Si lancia solo se l'aggregatore
+scrive "LANCIARE la coda F_bis" (regola A.4); in quel caso basta cambiare `"F"` in `"F_bis"` nel notebook F.
 
 I file `.ipynb` sono dentro `pianob_code.zip`, nella cartella `notebooks/`. Estrai lo zip sul PC per averli a portata di mano.
 
@@ -125,6 +131,23 @@ Per ogni account:
 4. Per l'esecuzione in background: in alto a destra **Save Version** → *Save & Run All (Commit)* → *Save*. La run continua anche a browser chiuso. La trovi in *View Active Events* o nella pagina del notebook, alla voce *Versions*.
 
 Non usare *Run All* in modalità interattiva: la sessione si interrompe se chiudi il browser.
+
+### C2. REVE: token Hugging Face e Internet (solo notebook G)
+
+I pesi di `brain-bzh/reve-base` sono pubblicati con condizioni d'uso (niente redistribuzione, niente
+re-identificazione). Per questo non stanno nello zip dei dati: il notebook G li scarica a ogni sessione.
+
+1. Su huggingface.co, con il tuo account, apri `brain-bzh/reve-base` e accetta le condizioni d'uso.
+2. *Settings* → *Access Tokens* → crea un token di tipo **Read**.
+3. Nel notebook G su Kaggle: menu *Add-ons* → *Secrets* → *Add a new secret*, nome **`HF_TOKEN`**, valore = il
+   token. Attiva l'interruttore accanto al secret per questo notebook.
+4. *Session options* → *Internet*: **on** (serve per il download; se l'opzione è bloccata va verificato il
+   telefono dell'account Kaggle).
+
+Il notebook scarica i pesi in `/tmp` (fuori da `/kaggle/working`, quindi non finiscono nell'output che poi
+ricarichi come Dataset per la ripresa) e stampa la revisione scaricata (commit). Per fissare una revisione:
+`os.environ["PIANOB_REVE_REVISION"] = "<commit>"` prima della cella di download. Prima di partire esegue i
+controlli obbligatori (conteggi 6720/1680/1932, forme, 1.807.881 parametri allenabili in LP, pesi strict).
 
 ### Limiti di Kaggle
 

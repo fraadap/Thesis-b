@@ -146,6 +146,60 @@ def gate1(jobs: list[dict]) -> dict:
             ("NON PASSATO" if len(vals) >= 3 else "parziale")}
 
 
+GATE_R_TARGET, GATE_R_RANGE, GATE_R1 = 0.5646, (0.548, 0.581), (0.422, 0.028)
+
+
+def gate_r(jobs: list[dict]) -> dict:
+    """Gate R (Sessione 02): REVE-Base su split_fm, BA pooled per segmento all'epoca con la migliore BA di
+    validation della fase FT (R2/R3); R1 = solo linear probing, da confrontare con 0.422 +- 0.028."""
+    def vals(cfg):
+        return {j["job_id"].split("__s")[1].split("__")[0]: j["pooled_all"]["ba_win"] for j in jobs
+                if j.get("config") == cfg and "__split_fm__" in j["job_id"] and j["job_id"].endswith("__emo9__base")
+                and "pooled_all" in j}
+    r1, r2 = vals("reve_base_lp"), vals("reve_base")
+    out = {"R1": {"per_seed": {k: round(v, 4) for k, v in r1.items()}, "target": GATE_R1}}
+    if r1:
+        m1 = float(np.mean(list(r1.values())))
+        out["R1"]["mean"] = round(m1, 4)
+        out["R1"]["diagnosi"] = ("compatibile" if abs(m1 - GATE_R1[0]) <= 2 * GATE_R1[1] else
+                                 "vicino a 0.24: c'è un pooling" if abs(m1 - 0.24) < 0.05 else
+                                 "vicino al caso: controlla pesi, scala, ordine dei canali, etichette" if m1 < 0.15 else
+                                 "fuori intervallo")
+    if not r2:
+        return {**out, "status": "non ancora eseguito"}
+    g = {s: v for s, v in r2.items() if int(s) in range(42, 47)}
+    g10 = {s: v for s, v in r2.items() if int(s) in range(42, 52)}
+    m = float(np.mean(list(g.values()))) if g else float("nan")
+    out["R2"] = {"n_seeds": len(g), "mean": round(m, 4), "sd": round(float(np.std(list(g.values()), ddof=1)), 4)
+                 if len(g) > 1 else None, "per_seed": {k: round(v, 4) for k, v in g.items()},
+                 "range": GATE_R_RANGE, "target": GATE_R_TARGET}
+    if len(g10) > len(g):
+        out["R3"] = {"n_seeds": len(g10), "mean": round(float(np.mean(list(g10.values()))), 4)}
+    out["status"] = ("PASSATO" if GATE_R_RANGE[0] <= m <= GATE_R_RANGE[1] else "NON PASSATO") if len(g) >= 5 else "parziale"
+    return out
+
+
+def timing(jobs: list[dict]) -> dict:
+    """Minuti per job e per fase, epoche effettive ed epoca migliore (Sessione 02)."""
+    out = {}
+    for j in jobs:
+        if not j.get("phase_minutes"):
+            continue
+        d = out.setdefault(j["config"], {"n": 0, "minutes": [], "phase_minutes": {}, "phase_epochs": {}, "best_epoch": []})
+        d["n"] += 1
+        d["minutes"].append(j.get("minutes", np.nan))
+        d["best_epoch"].append(j.get("best_epoch"))
+        for k, v in j["phase_minutes"].items():
+            d["phase_minutes"].setdefault(k, []).append(v)
+        for k, v in (j.get("phase_epochs") or {}).items():
+            d["phase_epochs"].setdefault(k, []).append(v)
+    return {c: {"n": d["n"], "min_job": round(float(np.nanmean(d["minutes"])), 1),
+                "min_fase": {k: round(float(np.mean(v)), 1) for k, v in d["phase_minutes"].items()},
+                "epoche": {k: round(float(np.mean(v)), 1) for k, v in d["phase_epochs"].items()},
+                "epoca_migliore": round(float(np.mean([b for b in d["best_epoch"] if b is not None] or [np.nan])), 1)}
+            for c, d in out.items()}
+
+
 def _r3(v) -> list:
     """Arrotonda a 3 decimali; NaN -> null (JSON valido)."""
     return [None if not np.isfinite(x) else round(float(x), 3) for x in np.asarray(v, float)]
@@ -161,10 +215,19 @@ def compact_json(df: pd.DataFrame, jobs: list[dict], account: str) -> dict:
                                   "bw": _r3(ps.ba_win.values), "bt": _r3(ps.ba_trial.values)})
     extra = {}
     for j in jobs:
-        for k in ("clip_probe", "bnalpha_n0_selected", "perm_all", "perm_unseen", "testperm_all", "testperm_unseen"):
+        for k in ("clip_probe", "clip_probe_token_mean", "bnalpha_n0_selected", "perm_all", "perm_unseen",
+                  "testperm_all", "testperm_unseen"):
             if k in j:
                 extra.setdefault(j["job_id"], {})[k] = j[k]
+    for j in jobs:          # REVE: revisione dei pesi e varianti di §R8 scelte (una volta per job)
+        if str(j.get("config", "")).startswith("reve") and (j.get("pretrained") or j.get("variants")):
+            extra.setdefault(j["job_id"], {}).update(
+                {"pesi": {k: (j.get("pretrained") or {}).get(k) for k in ("revision", "sha256", "strict")},
+                 "varianti": j.get("variants"), "best_epoch": j.get("best_epoch"),
+                 "phase_best": j.get("phase_best")})
     out["job_extra"] = extra
+    out["gate_r"] = gate_r(jobs)
+    out["timing"] = timing(jobs)
     hpo = {}
     for p in (kaggle_env.state_dir() / "hpo_best").glob("*.json"):
         hpo[p.stem] = json.loads(p.read_text())

@@ -15,11 +15,11 @@ from .. import kaggle_env
 from ..config import TRAIN_DEFAULTS
 from ..experiments.queue import Job
 from ..experiments.registry import get_config
-from .search_spaces import N_TRIALS, apply_params, sample
+from .search_spaces import MAX_RESOURCE, N_TRIALS, apply_params, sample
 
 # studio -> config base
 STUDY_CONFIG = {"tsception_ea": "tsception_ea", "eegnet_ea": "eegnet_ea", "cbramod_lora_r2": "cbramod_lora_r2",
-                "cbramod_ft_official_lr": "cbramod_ft_official"}
+                "cbramod_ft_official_lr": "cbramod_ft_official", "cbramod_twophase": "cbramod_twophase_pre"}
 
 
 def storage_path(study: str):
@@ -69,6 +69,13 @@ def write_best(study, name: str) -> dict:
     out = {"study": name, "params": best.params, "value": best.value, "trial": best.number,
            "n_complete": len(comp), "n_pruned": len(study.get_trials(deepcopy=False, states=(S.PRUNED,))),
            "best_epoch": best.user_attrs.get("best_epoch")}
+    if "head" in best.params:     # migliore trial per ciascuna testa (ablazione A.4 della Sessione 02)
+        by = {}
+        for t in comp:
+            h = t.params.get("head")
+            if h is not None and (h not in by or t.value > by[h]["value"]):
+                by[h] = {"params": t.params, "value": t.value, "trial": t.number}
+        out["best_by_head"] = by
     kaggle_env.write_json(kaggle_env.state_dir() / "hpo_best" / f"{name}.json", out)
     return out
 
@@ -79,14 +86,15 @@ def run_hpo_job(job: Job, ctx) -> str:
     except ImportError as e:
         raise RuntimeError("optuna non disponibile nell'immagine: attiva internet e `pip install optuna`") from e
     from ..experiments.jobs import build_banks, make_model, prepare
-    from ..train.loop import train_model
+    from ..train.loop import fit
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     name = job.config
     n_target = job.n_trials or N_TRIALS[name]
     base = get_config(STUDY_CONFIG[name])
     sampler = optuna.samplers.TPESampler(multivariate=True, group=True, n_startup_trials=10,
                                          seed=1000 * (job.seed + 1) + job.shard)
-    pruner = optuna.pruners.HyperbandPruner(min_resource=5, max_resource=50, reduction_factor=3)
+    pruner = optuna.pruners.HyperbandPruner(min_resource=5, max_resource=MAX_RESOURCE.get(name, 50),
+                                            reduction_factor=3)
     study = optuna.create_study(study_name=name, storage=_storage(name), direction="maximize",
                                 sampler=sampler, pruner=pruner, load_if_exists=True)
     if name == "cbramod_ft_official_lr" and not study.trials:
@@ -106,11 +114,10 @@ def run_hpo_job(job: Job, ctx) -> str:
         banks = build_banks(hpo_job, ctx, jd, win_len, need_train=True, need_test=False)  # test mai caricato
         import torch
         torch.manual_seed(trial.number)
-        model = make_model(ctx, cfg, len(jd.channels), win_len, jd.n_classes)
+        model = make_model(ctx, cfg, len(jd.channels), win_len, jd.n_classes, jd.channel_names)
         t0 = time.time()
-        res = train_model(model, hp, cfg.recipe, banks["train"], banks["val"], jd.n_classes, ctx.device,
-                          seed=trial.number, trial=trial, guard=ctx.guard,
-                          log=lambda m: None)
+        res = fit(model, hp, cfg.recipe, banks["train"], banks["val"], jd.n_classes, ctx.device,
+                  seed=trial.number, trial=trial, guard=ctx.guard, log=lambda m: None)
         trial_minutes.append((time.time() - t0) / 60)
         trial.set_user_attr("best_epoch", res["best_epoch"])
         trial.set_user_attr("minutes", trial_minutes[-1])

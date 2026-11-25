@@ -59,6 +59,56 @@ def class_weights(labels, n_classes: int) -> torch.Tensor:
     return torch.tensor(w, dtype=torch.float32)
 
 
+def forward_model(model, x, subj=None):
+    """Chiamata del modello: passa gli ID dei soggetti solo ai modelli che li usano
+    (standardizzazione per soggetto degli embedding, Sessione 02). Gli altri modelli restano invariati."""
+    if getattr(model, "needs_subject", False):
+        return model(x, subj)
+    return model(x)
+
+
+def batch_subjects(bank: "TrialBank", idx, device) -> torch.Tensor:
+    return torch.as_tensor(bank.ws.subject[np.asarray(idx)], dtype=torch.long, device=device)
+
+
+@torch.no_grad()
+def compute_subject_stats(model, bank: "TrialBank", device, mask=None, batch_size: int = 128,
+                          amp: bool = True) -> dict:
+    """Media e deviazione standard dell'embedding (prima della standardizzazione) per soggetto, SENZA
+    etichette, sulle finestre di `bank` (eventualmente ristrette da `mask`, es. solo le clip fuori dal
+    fold di test per il controllo 'heldout'). Scrive le statistiche nella cache del modello."""
+    norm = getattr(model, "norm", None)
+    if norm is None or norm.mode == "none":
+        return {}
+    was_training = model.training
+    model.eval()
+    idx = np.arange(bank.n) if mask is None else np.where(np.asarray(mask))[0]
+    use_amp = amp and torch.device(device).type == "cuda"
+    subj_all = bank.ws.subject[idx]
+    sums, sqs, cnt = {}, {}, {}
+    for i in range(0, len(idx), batch_size):
+        b = idx[i:i + batch_size]
+        x, _ = bank.get(b, device)
+        with torch.autocast("cuda", dtype=torch.float16, enabled=use_amp):
+            e = model.pooled_embedding(x)
+        e = e.double()
+        sb = subj_all[i:i + batch_size]
+        for s in np.unique(sb):
+            m = torch.as_tensor(sb == s, device=e.device)
+            es = e[m]
+            sums[s] = sums.get(s, 0) + es.sum(0)
+            sqs[s] = sqs.get(s, 0) + (es * es).sum(0)
+            cnt[s] = cnt.get(s, 0) + int(m.sum())
+    subs = sorted(sums)
+    mean = torch.stack([sums[s] / cnt[s] for s in subs])
+    var = torch.stack([sqs[s] / cnt[s] for s in subs]) - mean ** 2
+    std = var.clamp_min(0).sqrt()
+    norm.set_stats(subs, mean.float(), std.float())
+    if was_training:
+        model.train()
+    return {"subjects": [int(s) for s in subs], "n_windows": {int(s): cnt[s] for s in subs}}
+
+
 @torch.no_grad()
 def predict(model, bank: TrialBank, device, batch_size: int = 128, amp: bool = True,
             idx=None, return_embed: bool = False):
@@ -72,16 +122,12 @@ def predict(model, bank: TrialBank, device, batch_size: int = 128, amp: bool = T
             if return_embed:
                 e = model.embed(x)
                 embs.append(e.float().cpu())
-                out = _head_from_embed(model, x, e)
+                out = forward_model(model, x, batch_subjects(bank, idx[i:i + batch_size], device))
             else:
-                out = model(x)
+                out = forward_model(model, x, batch_subjects(bank, idx[i:i + batch_size], device))
         probs.append(torch.softmax(out.float(), dim=1).cpu())
     P = torch.cat(probs).numpy()
     return (P, torch.cat(embs).numpy()) if return_embed else P
-
-
-def _head_from_embed(model, x, e):
-    return model(x)
 
 
 def build_optimizer(model, hp: dict, recipe: str, steps_per_epoch: int):
@@ -120,7 +166,8 @@ def validate(model, bank, device, amp, n_classes):
     ev = evaluate_predictions(P, bank.ws.subject, bank.ws.clip, bank.ws.label)
     return {"ba_subject_mean": subject_mean(ev["per_subject"], "ba_win"),
             "ba_trial_subject_mean": subject_mean(ev["per_subject"], "ba_trial"),
-            "kappa_pooled": ev["pooled"]["kappa_win"], "ba_pooled": ev["pooled"]["ba_win"]}
+            "kappa_pooled": ev["pooled"]["kappa_win"], "ba_pooled": ev["pooled"]["ba_win"],
+            "acc_pooled": ev["pooled"]["acc_win"]}
 
 
 def _rng_state():
@@ -188,6 +235,8 @@ def train_model(model: nn.Module, hp: dict, recipe: str, train_bank: TrialBank, 
     lora_params = {id(p) for n, p in model.named_parameters() if ".parametrizations." in n}
     for epoch in range(start_epoch, int(hp["epochs"])):
         t0 = time.time()
+        if getattr(model, "needs_subject", False):
+            compute_subject_stats(model, train_bank, device, amp=use_amp)
         model.train()
         perm = rng.permutation(train_bank.n)
         losses = []
@@ -195,7 +244,7 @@ def train_model(model: nn.Module, hp: dict, recipe: str, train_bank: TrialBank, 
             x, y = train_bank.get(perm[i:i + bs], device)
             opt.zero_grad(set_to_none=True)
             with torch.autocast("cuda", dtype=torch.float16, enabled=use_amp):
-                out = model(x)
+                out = forward_model(model, x, batch_subjects(train_bank, perm[i:i + bs], device))
             loss = crit(out.float(), y)
             scaler.scale(loss).backward()
             if epoch < warm:  # warm-up: solo la testa (i parametri senza grad sono saltati da AdamW)
@@ -214,6 +263,8 @@ def train_model(model: nn.Module, hp: dict, recipe: str, train_bank: TrialBank, 
             losses.append(loss.item())
         if not np.isfinite(np.mean(losses)):
             raise FloatingPointError(f"loss non finita all'epoca {epoch}: dati o training numericamente instabili")
+        if getattr(model, "needs_subject", False):
+            compute_subject_stats(model, val_bank, device, amp=use_amp)
         v = validate(model, val_bank, device, use_amp, n_classes)
         score = v[select]
         history.append({"epoch": epoch, "loss": float(np.mean(losses)), **v, "sec": time.time() - t0})
@@ -244,3 +295,16 @@ def train_model(model: nn.Module, hp: dict, recipe: str, train_bank: TrialBank, 
         best_state = copy.deepcopy(model.state_dict())
     return {"best_state": best_state, "best_epoch": best_epoch, "best_score": float(best_score),
             "history": history, "status": status}
+
+
+def fit(model: nn.Module, hp: dict, recipe: str, train_bank: TrialBank, val_bank: TrialBank, n_classes: int,
+        device, seed: int, **kw) -> dict:
+    """Sceglie la procedura di training dalla ricetta della config. Le ricette esistenti passano da
+    `train_model` senza modifiche; 'twophase' (CBraMod LP-FT) e 'reve_official' sono della Sessione 02."""
+    if recipe == "twophase":
+        from .twophase import train_twophase
+        return train_twophase(model, hp, train_bank, val_bank, n_classes, device, seed, **kw)
+    if recipe == "reve_official":
+        from .reve_recipe import train_reve_official
+        return train_reve_official(model, hp, train_bank, val_bank, n_classes, device, seed, **kw)
+    return train_model(model, hp, recipe, train_bank, val_bank, n_classes, device, seed, **kw)

@@ -380,8 +380,106 @@ def queue_nbE() -> list[Job]:
     return J
 
 
+# ------------------------------------------------------------------ Sessione 02
+def queue_F() -> list[Job]:
+    """Notebook F (ricetta a due fasi e pretraining), in ordine di priorità:
+    Optuna cbramod_twophase (30 trial, 2 shard) -> controllo di sanità (split_fm, 1 seed: la BA di VALIDATION
+    deve superare 0.20, altrimenti il job fallisce e i job della Parte A non partono) -> Parte A
+    (pre-addestrato e da zero su split_fm e leave-clip-out, 2 permutati per fold) -> Parte B (da zero con
+    warm-up e pre-addestrato con warm-up su leave-clip-out)."""
+    from ..hpo.search_spaces import N_TRIALS
+    J = hpo_jobs("cbramod_twophase", N_TRIALS["cbramod_twophase"])
+    hpo_ids = [j.job_id for j in J]
+    sanity = Job("train", "cbramod_twophase_pre", "split_fm", 0, 3407, overrides={"sanity_min_val": 0.20},
+                 depends_on=hpo_ids)
+    J.append(sanity)
+    dep = [sanity.job_id]
+    J += train_jobs("cbramod_twophase_pre", ["split_fm"], [1, 2], depends_on=dep)
+    J += train_jobs("cbramod_twophase_pre", ["split_fm_lco"], CBRAMOD_SEEDS3, depends_on=dep)
+    J += perm_jobs("cbramod_twophase_pre", "split_fm_lco", perms=range(2), seed=3407, deps=dep)
+    J += train_jobs("cbramod_twophase_scratch", ["split_fm", "split_fm_lco"], CBRAMOD_SEEDS3, depends_on=dep)
+    # Parte B: il pretraining sulle clip non viste (le ricette con warm-up esistono solo su split_fm)
+    J += train_jobs("cbramod_scratch_ft_warmup", ["split_fm_lco"], CBRAMOD_SEEDS3)
+    J += train_jobs("cbramod_ft_official_warmup", ["split_fm_lco"], CBRAMOD_SEEDS3)
+    return J
+
+
+def queue_F_bis() -> list[Job]:
+    """Ablazione A.4 (PREPARATA, da lanciare solo se cbramod_twophase_pre sulle clip non viste supera il caso:
+    Wilcoxon unilaterale per soggetto contro 1/9, p < 0.05). Una modifica alla volta rispetto al migliore,
+    leave-clip-out, 3 seed. La scelta della prima riga dipende dalla testa scelta da Optuna: se è già
+    flat_official si usa la migliore configurazione con testa a pooling, e le due varianti della
+    standardizzazione non hanno senso (la testa appiattita non la usa)."""
+    best = _hpo_best_params("cbramod_twophase")
+    flat_best = best.get("head") == "flat_official"
+    cfgs = ["cbramod_twophase_pre_bestpool"] if flat_best else \
+        ["cbramod_twophase_pre_flathead", "cbramod_twophase_pre_nonorm", "cbramod_twophase_pre_heldoutnorm"]
+    cfgs.append("cbramod_official_poolhead")
+    J = []
+    for c in cfgs:
+        J += train_jobs(c, ["split_fm_lco"], CBRAMOD_SEEDS3)
+    return J
+
+
+def _hpo_best_params(study: str) -> dict:
+    p = Path(__file__).resolve().parents[1] / "hpo" / "best" / f"{study}.json"
+    return json.loads(p.read_text()).get("params", {}) if p.exists() else {}
+
+
+REVE_SEEDS_GATE = [42, 43, 44, 45, 46]
+REVE_SEEDS_GATE_R3 = [47, 48, 49, 50, 51]
+
+
+def queue_G() -> list[Job]:
+    """Notebook G (REVE-Base), in ordine di priorità (§C.3): se il tempo finisce, i blocchi 1-4 devono essere
+    completi. Stesse definizioni di CBraMod: soggetti, fold di clip, seed, mappe di permutazione (indice della
+    permutazione), estrazioni del controllo a parità di dati, insiemi di canali, tagli di banda.
+    Stime a priori (est_min) da ricalibrare dopo il primo job: ~45 min split_fm, ~35 min per fold LCO."""
+    R, E = "reve_base", {"split_fm": 45, "split_fm_lco": 35, "split_fm_sizematched": 35}
+
+    def tj(config, protocols, seeds, **kw):
+        return [Job("train", config, p, f, s, est_min=E.get(p, 45), **kw)
+                for p in protocols for f in _folds(p) for s in seeds]
+    J = []
+    # 1. Gate R: R1 (solo LP, 1 seed) e R2 (LP+FT, 5 seed); la sonda della clip (blocco 8) sul primo seed
+    J += tj("reve_base_lp", ["split_fm"], [42])
+    J += [Job("train", R, "split_fm", 0, s, probe=(s == 42), est_min=45) for s in REVE_SEEDS_GATE]
+    # 2. split_fm con T_k: dai job di R2 (condizioni tk0..2 calcolate nello stesso job)
+    # 3. leave-clip-out (risultato centrale)
+    J += tj(R, ["split_fm_lco"], SEEDS3)
+    # 4. permutati sul leave-clip-out
+    J += [Job("train", R, "split_fm_lco", f, 0, perm=k, est_min=35) for k in range(2) for f in _folds("split_fm_lco")]
+    # 5. a parità di dati (+ 2 permutati), estrazione 0 come CBraMod
+    J += [dataclasses_replace(j, est_min=35) for j in sizematched_jobs(R, SEEDS3, draws=[0], n_perm_models=2)]
+    # 6. bande: solo 4-30, solo passa-alto 4 Hz, solo passa-basso 30 Hz (3 seed)
+    J += [Job("train", R, "split_fm", 0, s, band=b, est_min=45) for b in ([4, 30], [4, 47], [0, 30]) for s in SEEDS3]
+    # 7. canali (stesse estrazioni di CBraMod): bordo, metà frontale, metà temporale, casuali; 4-30 con bordo e casuali
+    J += [Job("train", R, "split_fm", 0, s, drop="edge8", est_min=45) for s in SEEDS3]
+    J += [Job("train", R, "split_fm", 0, s, drop=d, est_min=45) for d in ("ocular4", "temporal4") for s in SEEDS3]
+    J += [Job("train", R, "split_fm", 0, SEEDS3[k], drop=f"rand4_d{k}", est_min=45) for k in range(3)]
+    J += [Job("train", R, "split_fm", 0, SEEDS3[k], drop=f"rand8_d{k}", est_min=45) for k in range(3)]
+    J += [Job("train", R, "split_fm", 0, s, band=[4, 30], drop="edge8", est_min=45) for s in SEEDS3]
+    J += [Job("train", R, "split_fm", 0, SEEDS3[k], band=[4, 30], drop=f"rand8_d{k}", est_min=45) for k in range(3)]
+    # 8. sonda dell'identità della clip: nel job R2 con seed 42 (contesto della query cls e media dei token)
+    # 9. valenza binaria (positivo contro negativo): REVE e, perché non esiste, CBraMod ricetta ufficiale
+    J += tj(R, ["split_fm", "split_fm_lco"], SEEDS3, task="val2")
+    J += train_jobs("cbramod_ft_official", ["split_fm", "split_fm_lco"], SEEDS3, task="val2")
+    # R3 (se resta tempo): altri 5 seed del Gate
+    J += [Job("train", R, "split_fm", 0, s, est_min=45) for s in REVE_SEEDS_GATE_R3]
+    # 10-11. opzionali: REVE da zero; LoRA rango 16
+    J += tj("reve_base_scratch", ["split_fm", "split_fm_lco"], SEEDS3)
+    J += tj("reve_base_lora16", ["split_fm", "split_fm_lco"], SEEDS3)
+    return J
+
+
+def dataclasses_replace(job: Job, **kw) -> Job:
+    from dataclasses import replace
+    return replace(job, **kw)
+
+
 QUEUES = {"nb0_smoke": queue_nb0, "nbA_baselines_tsception": queue_nbA, "nbB_cbramod_gate": queue_nbB,
-          "nbC_cbramod_main": queue_nbC, "nbD_lnso10": queue_nbD, "nbE_eegnet": queue_nbE}
+          "nbC_cbramod_main": queue_nbC, "nbD_lnso10": queue_nbD, "nbE_eegnet": queue_nbE,
+          "F": queue_F, "F_bis": queue_F_bis, "G": queue_G}
 
 
 def main():

@@ -231,6 +231,10 @@ Anche per la valenza il vantaggio sopra il caso dipende dalle clip condivise.
 | 7 | ✅ Fatto (account 3, notebook E, 57 job) | EEGNet originale + EA: leave-clip-out + 2 permutati, a parità di dati + 2 permutati, finestre da 4 s, 400 epoche. TSception originale (Ding 2022, 10 s) con e senza EA su split FM; con EA anche su leave-clip-out + 2 permutati | Clip non viste contro il caso; scomposizione; effetto della finestra | **Il miglior modello compatto (0.455) generalizza a stimoli nuovi?** H3 sul compatto |
 | 5 | Da decidere dopo i punti 1–3 | CBraMod sui 10 fold | Se serve: su clip nuove è già al caso con margine netto | Robustezza del risultato centrale su 123 soggetti |
 
+| 10 | 🆕 Sessione 02, notebook F (50 job, 1–2 sessioni) | Optuna della ricetta a due fasi; CBraMod a due fasi pre-addestrato e da zero (split FM, LCO, 2 permutati); da zero e pre-addestrato con warm-up su LCO | Clip non viste contro il caso con un'altra ricetta e una testa a pooling; pretraining su viste e non viste | Il risultato centrale regge cambiando ricetta? (S2) Il pretraining aiuta sulle clip nuove? (S1) |
+| 11 | 🆕 Sessione 02, notebook G (119 job, 3–4 sessioni) | REVE-Base: Gate R (R1, R2) poi tutti i protocolli di CBraMod, valenza binaria anche per CBraMod | R2 tra 0.548 e 0.581; clip non viste; memorizzazione; bande e canali | Un secondo foundation model generalizza a stimoli nuovi? (S3) Dipende dal contenuto fuori 4–30 Hz? (S4) |
+| 12 | Solo se la regola A.4 lo dice: coda `F_bis` | Ablazione della testa e della standardizzazione | Quale componente produce la generalizzazione | — |
+
 **Facoltativi (💤 finché non servono):**
 - clipping robusto degli artefatti;
 - tuning annidato per fold: ottimismo della stima sui 10 fold, dovuto al tuning su sub080–099;

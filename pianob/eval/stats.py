@@ -7,9 +7,10 @@ import numpy as np
 from scipy import stats
 
 
-def paired_test(a, b, n_boot: int = 10_000, seed: int = 0) -> dict:
+def paired_test(a, b, n_boot: int = 10_000, seed: int = 0, alternative: str = "two-sided") -> dict:
     """Confronto appaiato per soggetto di a contro b (stessi soggetti, stesso ordine).
-    Wilcoxon signed-rank con n >= 20, permutazione esatta dei segni sotto 20."""
+    Wilcoxon signed-rank con n >= 20, permutazione esatta dei segni sotto 20.
+    `alternative` = 'greater' per i test unilaterali della seconda famiglia (Sessione 02)."""
     a, b = np.asarray(a, float), np.asarray(b, float)
     ok = ~(np.isnan(a) | np.isnan(b))
     d = a[ok] - b[ok]
@@ -28,11 +29,15 @@ def paired_test(a, b, n_boot: int = 10_000, seed: int = 0) -> dict:
         if np.all(d == 0):
             out["p"], out["test"] = 1.0, "wilcoxon"
         else:
-            out["p"] = float(stats.wilcoxon(d, zero_method="wilcox", alternative="two-sided").pvalue)
-            out["test"] = "wilcoxon"
+            out["p"] = float(stats.wilcoxon(d, zero_method="wilcox", alternative=alternative).pvalue)
+            out["test"] = "wilcoxon" if alternative == "two-sided" else f"wilcoxon ({alternative})"
     else:
-        out["p"] = sign_flip_exact(d)
-        out["test"] = "sign-flip esatto"
+        p2 = sign_flip_exact(d)
+        if alternative == "two-sided":
+            out["p"] = p2
+        else:   # unilaterale dal bilaterale simmetrico
+            out["p"] = p2 / 2 if (d.mean() > 0) == (alternative == "greater") else 1 - p2 / 2
+        out["test"] = "sign-flip esatto" + ("" if alternative == "two-sided" else f" ({alternative})")
     return out
 
 

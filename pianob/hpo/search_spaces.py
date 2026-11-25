@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import copy
 
-N_TRIALS = {"tsception_ea": 60, "eegnet_ea": 40, "cbramod_lora_r2": 30, "cbramod_ft_official_lr": 10}
+N_TRIALS = {"tsception_ea": 60, "eegnet_ea": 40, "cbramod_lora_r2": 30, "cbramod_ft_official_lr": 10,
+            "cbramod_twophase": 30}
+# epoche massime per Hyperband (risorsa = epoca globale; per la ricetta a due fasi LP + FT <= 10 + 50)
+MAX_RESOURCE = {"cbramod_twophase": 60}
 
 
 def sample(study: str, trial) -> dict:
@@ -40,6 +43,23 @@ def sample(study: str, trial) -> dict:
             # davvero efficiente. Scelta lasciata alla validation.
             "head": trial.suggest_categorical("head", ["all_patch_reps", "pooled_mlp"]),
         }
+    if study == "cbramod_twophase":   # Sessione 02, Parte A.2
+        head = trial.suggest_categorical("head", ["flat_official", "pool_channel", "pool_global"])
+        out = {"head": head}
+        # standardizzazione per soggetto solo per le teste a pooling (parametro condizionale)
+        out["subj_embed_norm"] = (trial.suggest_categorical("subj_embed_norm", ["none", "session"])
+                                  if head != "flat_official" else "none")
+        out.update({
+            "lp_epochs": trial.suggest_categorical("lp_epochs", [3, 5, 10]),
+            "ft_epochs": trial.suggest_categorical("ft_epochs", [10, 20, 50]),
+            "lr_head_lp": trial.suggest_float("lr_head_lp", 1e-4, 5e-3, log=True),
+            "lr_backbone_ft": trial.suggest_float("lr_backbone_ft", 5e-6, 1e-4, log=True),
+            "lr_head_ft": trial.suggest_float("lr_head_ft", 5e-5, 1e-3, log=True),
+            "warmup_frac": trial.suggest_categorical("warmup_frac", [0.05, 0.1, 0.2]),
+            "label_smoothing": trial.suggest_categorical("label_smoothing", [0.0, 0.1, 0.2]),
+            "dropout": trial.suggest_float("dropout", 0.1, 0.5),
+        })
+        return out
     if study == "cbramod_ft_official_lr":
         return {"lr": trial.suggest_categorical("lr", [5e-5, 1e-4, 2e-4]),
                 "multi_lr": trial.suggest_categorical("multi_lr", [True, False])}

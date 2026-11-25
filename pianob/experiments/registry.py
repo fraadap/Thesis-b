@@ -17,6 +17,19 @@ _LORA = {
     "lr_head": 1e-3, "lr_lora": 5e-4, "lr": 5e-4, "weight_decay": 1e-2, "label_smoothing": 0.1,
     "warmup_head_epochs": 5, "head": "all_patch_reps", "dropout": 0.1, "patience": 10, "clip_grad": 1.0,
 }
+# Sessione 02: ricetta a due fasi (default prima di Optuna; Optuna sovrascrive)
+_TWOPHASE = {"lp_epochs": 5, "ft_epochs": 20, "lr_head_lp": 1e-3, "lr_backbone_ft": 3e-5, "lr_head_ft": 3e-4,
+             "warmup_frac": 0.1, "label_smoothing": 0.1, "weight_decay": 0.05, "batch_size": 64,
+             "clip_grad_ft": 1.0, "patience": 10, "dropout": 0.1, "head": "pool_channel",
+             "subj_embed_norm": "session", "select_metric": "ba_subject_mean"}
+# REVE, ricetta ufficiale (dt.py + faced.yaml, commit 06a7059a; Appendice R §R6). Varianti A di §R8:
+# dropout 0.0, GradScaler spento, niente LoRA.
+_REVE_OFFICIAL = {"training_mode": "lp+ft", "lp_epochs": 20, "ft_epochs": 200, "lp_warmup_epochs": 3,
+                  "ft_warmup_epochs": 5, "lr_lp": 5e-3, "lr_ft": 1e-4, "batch_size": 64, "patience": 10,
+                  "plateau_patience": 6, "plateau_factor": 0.5, "mixup": True, "clip_grad": 2.0,
+                  "weight_decay": 0.01, "betas": (0.92, 0.999), "eps": 1e-9, "dropout_lp": 0.0,
+                  "dropout_ft": 0.0, "grad_scaler": False, "input_scale": 0.001,
+                  "select_metric": "ba_pooled", "plateau_metric": "acc_pooled"}
 _TSC = {"epochs": 50, "batch_size": 64, "lr": 1e-3, "weight_decay": 1e-2, "dropout": 0.5, "num_T": 15,
         "num_S": 15, "hidden": 32, "label_smoothing": 0.1, "patience": 10}
 # Lawhern et al. 2018 (vedi le config eegnet_lawhern*)
@@ -101,7 +114,52 @@ def _all() -> dict[str, ExpConfig]:
         C("cbramod_lora_r2_zsub", "neural", "cbramod", window_s=10, pretrained=True, align="zscore",
           align_rescale=True, hparams=dict(_LORA), hpo_study="cbramod_lora_r2"),
         C("reve_base_lora", "neural", "reve", window_s=10, pretrained=True,
-          notes="RINVIATO: 69M parametri, codice remoto, accesso al checkpoint da verificare"),
+          notes="RINVIATO (sostituito dalle config reve_base* della Sessione 02)"),
+        # --- Sessione 02, Parte A: CBraMod con fine-tuning a due fasi (LP poi FT), iperparametri da Optuna ----
+        C("cbramod_twophase_pre", "neural", "cbramod", window_s=10, pretrained=True, recipe="twophase",
+          hparams=dict(_TWOPHASE), hpo_study="cbramod_twophase",
+          notes="LP-FT (Kumar et al. 2022), testa e standardizzazione per soggetto scelte in validation"),
+        C("cbramod_twophase_scratch", "neural", "cbramod", window_s=10, pretrained=False, recipe="twophase",
+          hparams=dict(_TWOPHASE), hpo_study="cbramod_twophase",
+          notes="stessi iperparametri da inizializzazione casuale: la fase LP su backbone casuale tiene solo "
+                "identico lo schedule"),
+        # Ablazione A.4 (preparata, da lanciare solo se cbramod_twophase_pre supera il caso sulle clip nuove):
+        # una modifica alla volta rispetto al migliore Optuna (le hparams qui sovrascrivono quelle di Optuna)
+        C("cbramod_twophase_pre_flathead", "neural", "cbramod", window_s=10, pretrained=True, recipe="twophase",
+          hparams={**_TWOPHASE, "head": "flat_official", "subj_embed_norm": "none",
+                   "hpo_fixed": ["head", "subj_embed_norm"]}, hpo_study="cbramod_twophase",
+          notes="A.4: testa ufficiale appiattita (se Optuna sceglie già flat_official, si usa la testa a pooling migliore: "
+                "vedi queue_F_bis)"),
+        C("cbramod_twophase_pre_nonorm", "neural", "cbramod", window_s=10, pretrained=True, recipe="twophase",
+          hparams={**_TWOPHASE, "subj_embed_norm": "none", "hpo_fixed": ["subj_embed_norm"]},
+          hpo_study="cbramod_twophase", notes="A.4"),
+        C("cbramod_twophase_pre_bestpool", "neural", "cbramod", window_s=10, pretrained=True, recipe="twophase",
+          hparams={**_TWOPHASE, "hpo_variant": "best_pool_head"}, hpo_study="cbramod_twophase",
+          notes="A.4 se Optuna sceglie flat_official: migliore configurazione con testa a pooling"),
+        C("cbramod_twophase_pre_heldoutnorm", "neural", "cbramod", window_s=10, pretrained=True, recipe="twophase",
+          hparams={**_TWOPHASE, "subj_embed_norm": "heldout", "hpo_fixed": ["subj_embed_norm"]},
+          hpo_study="cbramod_twophase", notes="A.4"),
+        C("cbramod_official_poolhead", "neural", "cbramod", window_s=10, pretrained=True, recipe="cbramod_official",
+          hparams={**_CBRAMOD_OFFICIAL, "hpo_keys": ["head", "subj_embed_norm", "dropout"]},
+          hpo_study="cbramod_twophase",
+          notes="A.4: ricetta ufficiale con la testa (e la standardizzazione) migliori di Optuna; gli altri "
+                "iperparametri restano quelli ufficiali (resolve_config applica solo head/subj_embed_norm/dropout)"),
+        # --- Sessione 02, Parte C: REVE-Base (Appendice R del prompt) -------------------------------------------
+        C("reve_base", "neural", "reve", window_s=10, pretrained=True, recipe="reve_official",
+          hparams=dict(_REVE_OFFICIAL), notes="REVE-Base, LP+FT con la ricetta ufficiale (dt.py, commit 06a7059a)"),
+        C("reve_base_lp", "neural", "reve", window_s=10, pretrained=True, recipe="reve_official",
+          hparams={**_REVE_OFFICIAL, "training_mode": "lp"}, notes="Gate R1: solo linear probing, senza pooling"),
+        C("reve_base_gradscaler", "neural", "reve", window_s=10, pretrained=True, recipe="reve_official",
+          hparams={**_REVE_OFFICIAL, "grad_scaler": True},
+          notes="variante B di §R8.2 (GradScaler attivo): solo se il training fp16 è instabile, scelta in validation"),
+        C("reve_base_yamldropout", "neural", "reve", window_s=10, pretrained=True, recipe="reve_official",
+          hparams={**_REVE_OFFICIAL, "dropout_lp": 0.05, "dropout_ft": 0.1},
+          notes="variante B di §R8.3 (dropout dello YAML): solo diagnostica, scelta in validation"),
+        C("reve_base_scratch", "neural", "reve", window_s=10, pretrained=False, recipe="reve_official",
+          hparams=dict(_REVE_OFFICIAL), notes="opzionale: REVE da inizializzazione casuale, ricetta ufficiale"),
+        C("reve_base_lora16", "neural", "reve", window_s=10, pretrained=True, recipe="reve_official",
+          hparams={**_REVE_OFFICIAL, "lora_rank": 16, "lora_alpha": 16, "training_mode": "lora"},
+          notes="opzionale (§R8.4): LoRA rango 16 sull'attenzione, testa allenabile"),
     ]
     return {c.name: c for c in cfgs}
 
@@ -143,5 +201,23 @@ def resolve_config(name: str, require_hpo: bool = False) -> tuple[ExpConfig, str
         return cfg, "defaults"
     best = json.loads(p.read_text())
     from ..hpo.search_spaces import apply_params
-    cfg = apply_params(cfg, best["params"])
-    return cfg, f"optuna:{cfg.hpo_study}:{best.get('n_complete', '?')}trial"
+    params = dict(best["params"])
+    src = f"optuna:{cfg.hpo_study}:{best.get('n_complete', '?')}trial"
+    if cfg.hp("hpo_variant") == "best_pool_head":
+        # Sessione 02, A.4: migliore trial con testa a pooling (se Optuna sceglie la testa appiattita)
+        pools = {h: v for h, v in best.get("best_by_head", {}).items() if h != "flat_official"}
+        if not pools:
+            raise RuntimeError("nessun trial completato con testa a pooling nello studio cbramod_twophase")
+        h = max(pools, key=lambda k: pools[k]["value"])
+        params = dict(pools[h]["params"])
+        src += f":best_{h}"
+    if cfg.hp("hpo_keys"):                 # solo alcuni parametri dallo studio (es. testa per la ricetta ufficiale)
+        params = {k: v for k, v in params.items() if k in cfg.hp("hpo_keys")}
+    fixed = set(cfg.hp("hpo_fixed", ()))   # parametri fissati dalla config (ablazioni: una modifica alla volta)
+    params = {k: v for k, v in params.items() if k not in fixed}
+    if params.get("head") == "flat_official" and "subj_embed_norm" not in params:
+        params["subj_embed_norm"] = "none"
+    cfg = apply_params(cfg, params)
+    if cfg.hp("head") == "flat_official" and cfg.hp("subj_embed_norm", "none") != "none":
+        cfg.hparams["subj_embed_norm"] = "none"   # la standardizzazione vale solo per le teste a pooling
+    return cfg, src

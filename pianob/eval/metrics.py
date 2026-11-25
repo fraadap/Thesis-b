@@ -45,16 +45,22 @@ def evaluate_predictions(probs, subj, clip, label) -> dict:
     pred = probs.argmax(1)
     Pt, st, ct, lt = trial_aggregate(probs, subj, clip, label)
     predt = Pt.argmax(1)
+    # Sessione 02: anche la predizione per trial dalla media delle log-probabilità (colonna aggiuntiva)
+    Plp, _, _, _ = trial_aggregate(np.log(np.clip(probs.astype(np.float64), 1e-12, None)), subj, clip, label)
+    predt_lp = Plp.argmax(1)
     per_subject = {}
     for s in np.unique(subj):
         m, mt = subj == s, st == s
         w = basic_metrics(label[m], pred[m])
         t = basic_metrics(lt[mt], predt[mt])
-        per_subject[int(s)] = {"ba_win": w["ba"], "ba_trial": t["ba"], "kappa": w["kappa"], "f1w": w["f1w"],
+        per_subject[int(s)] = {"ba_win": w["ba"], "ba_trial": t["ba"],
+                               "ba_trial_lp": balanced_accuracy(lt[mt], predt_lp[mt]),
+                               "kappa": w["kappa"], "f1w": w["f1w"],
                                "f1m": w["f1m"], "acc_win": w["acc"], "n_windows": int(m.sum()),
                                "n_trials": int(mt.sum())}
     pooled_w = basic_metrics(label, pred)
     pooled_t = basic_metrics(lt, predt)
+    pooled_t["ba_lp"] = balanced_accuracy(lt, predt_lp)
     n_cls = probs.shape[1]
     return {"per_subject": per_subject,
             "pooled": {**{f"{k}_win": v for k, v in pooled_w.items()},

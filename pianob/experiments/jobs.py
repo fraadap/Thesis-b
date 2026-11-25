@@ -418,8 +418,12 @@ def build_banks(job: Job, ctx: Context, jd: JobData, win_len: int, need_train=Tr
     return banks
 
 
-def make_model(ctx: Context, cfg: ExpConfig, n_ch: int, win_len: int, n_classes: int):
+def make_model(ctx: Context, cfg: ExpConfig, n_ch: int, win_len: int, n_classes: int, channel_names=None):
     from ..models.heads import build_model
+    if cfg.model == "reve":
+        from ..models.reve import build_reve
+        return build_reve(cfg, n_ch, win_len, n_classes, channel_names, synthetic=ctx.adapter.synthetic,
+                          log=ctx.log)
     wp = ctx.weights_path
     if cfg.model == "cbramod" and cfg.pretrained and wp is None:
         if ctx.adapter.synthetic:
@@ -433,7 +437,7 @@ def make_model(ctx: Context, cfg: ExpConfig, n_ch: int, win_len: int, n_classes:
 def run_neural(job: Job, ctx: Context, cfg: ExpConfig, hp_source: str) -> str:
     import torch
     from ..models.lora import count_trainable
-    from ..train.loop import predict, train_model
+    from ..train.loop import compute_subject_stats, fit, predict
     from ..train.tta import bnalpha_predict, collect_subject_bn_stats, has_bn
     t0 = time.time()
     hp = {**TRAIN_DEFAULTS, **cfg.hparams, **job.overrides.get("hparams", {})}
@@ -443,18 +447,29 @@ def run_neural(job: Job, ctx: Context, cfg: ExpConfig, hp_source: str) -> str:
     sp = jd.split
     win_len = int(round(cfg.window_s * ctx.adapter.fs))
     banks = build_banks(job, ctx, jd, win_len)
-    model = make_model(ctx, cfg, len(jd.channels), win_len, jd.n_classes)
+    model = make_model(ctx, cfg, len(jd.channels), win_len, jd.n_classes, jd.channel_names)
     params = count_trainable(model)
     ctx.log(f"  {job.job_id}: train {banks['train'].n} fin., val {banks['val'].n}, test {banks['test'].n}; "
             f"parametri allenabili {params['trainable']:,}/{params['total']:,}; hp da {hp_source}")
     st = kaggle_env.state_dir()
     ckpt = st / "ckpt" / f"{job.job_id}.pt"
-    res = train_model(model, hp, cfg.recipe, banks["train"], banks["val"], jd.n_classes, ctx.device,
-                      job.seed, ckpt_path=ckpt, guard=ctx.guard, log=ctx.log)
+    res = fit(model, hp, cfg.recipe, banks["train"], banks["val"], jd.n_classes, ctx.device,
+              job.seed, ckpt_path=ckpt, guard=ctx.guard, log=ctx.log)
     if res["status"] == "interrupted":
         return "interrupted"
     model.load_state_dict(res["best_state"])
     test = banks["test"]
+    norm_info = {}
+    if getattr(model, "needs_subject", False):
+        # statistiche per soggetto ricalcolate sulla rete finale prima della valutazione (senza etichette).
+        # 'heldout': per i soggetti di test solo le clip fuori dal fold di test (controllo dell'uso trasduttivo)
+        mode = model.norm.mode
+        test_mask = np.isin(test.ws.clip, sp.train_clips) if (mode == "heldout" and sp.is_lco) else None
+        if test_mask is not None:
+            assert not np.isin(test.ws.clip[test_mask], sp.unseen_clips).any(), "finestre del fold di test nelle statistiche"
+        norm_info = {"mode": mode, "test_windows_used": int(test.n if test_mask is None else test_mask.sum())}
+        compute_subject_stats(model, banks["val"], ctx.device, amp=hp.get("amp", True))
+        compute_subject_stats(model, test, ctx.device, mask=test_mask, amp=hp.get("amp", True))
     P = predict(model, test, ctx.device, amp=hp.get("amp", True))
     minutes = (time.time() - t0) / 60
     extra = {**env_extra(ctx, minutes), "hp_source": hp_source, "best_epoch": res["best_epoch"]}
@@ -462,7 +477,10 @@ def run_neural(job: Job, ctx: Context, cfg: ExpConfig, hp_source: str) -> str:
     rec = {"job_id": job.job_id, "config": cfg.name, "status": res["status"], "best_epoch": res["best_epoch"],
            "val_best": res["best_score"], "history": res["history"], "params": params, "hp": hp,
            "hp_source": hp_source, "cfg": cfg.to_dict(), "minutes": minutes,
-           "pretrained": getattr(model, "pretrained_info", None)}
+           "pretrained": getattr(model, "pretrained_info", None),
+           "phase_minutes": res.get("phase_minutes"), "phase_epochs": res.get("phase_epochs"),
+           "phase_best": res.get("phase_best"),
+           "subj_embed_norm": norm_info or None, "variants": getattr(model, "variant_info", None)}
     from ..eval.shortcuts import test_label_permutation
     conds = _conditions(jd)
     rec.update(_size_info(sp))
@@ -510,6 +528,14 @@ def run_neural(job: Job, ctx: Context, cfg: ExpConfig, hp_source: str) -> str:
         pr = clip_probe(Etr, tr.ws.clip[idx_tr], Ete, test.ws.clip, test.ws.label, jd.clip_labels,
                         test_subj=test.ws.subject)
         rec["clip_probe"] = {k: v for k, v in pr.items() if k != "per_subject"}
+        for ename in getattr(model, "extra_embeddings", ()):      # es. REVE: media dei token
+            model.embed_mode = ename
+            _, Etr2 = predict(model, tr, ctx.device, idx=idx_tr, return_embed=True)
+            _, Ete2 = predict(model, test, ctx.device, return_embed=True)
+            pr2 = clip_probe(Etr2, tr.ws.clip[idx_tr], Ete2, test.ws.clip, test.ws.label, jd.clip_labels,
+                             test_subj=test.ws.subject)
+            rec[f"clip_probe_{ename}"] = {k: v for k, v in pr2.items() if k != "per_subject"}
+            model.embed_mode = None
         rec["model_ba_subject_mean"] = subject_mean(evaluate_predictions(P, test.ws.subject, test.ws.clip, test.ws.label)["per_subject"])
         for s, d in pr["per_subject"].items():
             rows.append({"config": cfg.name, "protocol": job.protocol, "fold": job.fold, "seed": job.seed,
@@ -528,4 +554,9 @@ def run_neural(job: Job, ctx: Context, cfg: ExpConfig, hp_source: str) -> str:
     _write(job, ctx, rows, rec)
     if ckpt.exists():
         ckpt.unlink()
+    thr = job.overrides.get("sanity_min_val")
+    if thr is not None and not res["best_score"] >= float(thr):
+        # i job che dipendono da questo non partono (job fallito): fermarsi e diagnosticare
+        raise RuntimeError(f"controllo di sanità fallito: BA di validation {res['best_score']:.3f} < {thr} "
+                           "(non chiaramente sopra il caso)")
     return res["status"]

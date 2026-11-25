@@ -16,9 +16,43 @@ from .cbramod import CBraMod
 PATCH = 200  # campioni per patch (1 s a 200 Hz)
 
 
+class SubjectEmbedNorm(nn.Module):
+    """z-score per soggetto di ogni dimensione dell'embedding (ricetta a due fasi, Sessione 02).
+
+    Statistiche calcolate SENZA etichette sulle finestre del soggetto (`compute_subject_stats` in
+    train/loop.py) e tenute in una cache indicizzata dall'ID del soggetto (buffer, quindi salvate nello
+    state_dict). mode: none | session (tutte le finestre del soggetto, trasduttivo come EA) | heldout
+    (solo le clip fuori dal fold di test: il calcolo lo restringe chi chiama, con una maschera)."""
+
+    def __init__(self, dim: int, mode: str = "none", n_slots: int = 128, eps: float = 1e-5):
+        super().__init__()
+        assert mode in ("none", "session", "heldout"), mode
+        self.mode, self.eps = mode, eps
+        self.register_buffer("mean", torch.zeros(n_slots, dim))
+        self.register_buffer("std", torch.ones(n_slots, dim))
+        self.register_buffer("valid", torch.zeros(n_slots, dtype=torch.bool))
+
+    @torch.no_grad()
+    def set_stats(self, subjects, mean: torch.Tensor, std: torch.Tensor) -> None:
+        idx = torch.as_tensor(list(subjects), dtype=torch.long, device=self.mean.device)
+        self.mean[idx] = mean.to(self.mean)
+        self.std[idx] = std.to(self.std)
+        self.valid[idx] = True
+
+    def forward(self, e: torch.Tensor, subj: torch.Tensor | None) -> torch.Tensor:
+        if self.mode == "none":
+            return e
+        assert subj is not None, "subj_embed_norm richiede gli ID dei soggetti nel batch"
+        subj = subj.to(self.mean.device).long()
+        if not bool(self.valid[subj].all()):
+            raise RuntimeError(f"statistiche dell'embedding mancanti per i soggetti {sorted(set(subj[~self.valid[subj]].tolist()))}")
+        return (e - self.mean[subj].to(e.dtype)) / (self.std[subj].to(e.dtype) + self.eps)
+
+
 class CBraModClassifier(nn.Module):
     def __init__(self, n_channels: int, n_samples: int, n_classes: int, head: str = "all_patch_reps",
-                 dropout: float = 0.1, pretrained_path: str | Path | None = None, n_layer: int = 12):
+                 dropout: float = 0.1, pretrained_path: str | Path | None = None, n_layer: int = 12,
+                 subj_embed_norm: str = "none"):
         super().__init__()
         assert n_samples % PATCH == 0, f"la finestra deve essere multipla di {PATCH} campioni"
         self.n_patches = n_samples // PATCH
@@ -30,7 +64,16 @@ class CBraModClassifier(nn.Module):
         self.backbone.proj_out = nn.Identity()
         C, S, D = n_channels, self.n_patches, 200
         self.head_type = head
-        if head == "all_patch_reps":
+        self.norm = None
+        if head in ("pool_channel", "pool_global"):
+            # Sessione 02: media sui patch (per canale, oppure su patch e canali) -> MLP compatto
+            E = C * D if head == "pool_channel" else D
+            self.embed_dim = E
+            self.norm = SubjectEmbedNorm(E, subj_embed_norm)
+            self.classifier = nn.Sequential(nn.Linear(E, 256), nn.ELU(), nn.Dropout(dropout), nn.Linear(256, n_classes))
+        elif subj_embed_norm not in ("none", None):
+            raise ValueError("subj_embed_norm vale solo per le teste a pooling (pool_channel, pool_global)")
+        elif head in ("all_patch_reps", "flat_official"):   # flat_official = nome della Sessione 02
             self.classifier = nn.Sequential(
                 nn.Flatten(1), nn.Linear(C * S * D, S * D), nn.ELU(), nn.Dropout(dropout),
                 nn.Linear(S * D, D), nn.ELU(), nn.Dropout(dropout), nn.Linear(D, n_classes))
@@ -50,7 +93,20 @@ class CBraModClassifier(nn.Module):
     def embed(self, x: torch.Tensor) -> torch.Tensor:
         return self.features(x).mean(dim=(1, 2))
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    @property
+    def needs_subject(self) -> bool:
+        return self.norm is not None and self.norm.mode != "none"
+
+    def pooled_embedding(self, x: torch.Tensor) -> torch.Tensor:
+        """Embedding delle teste a pooling PRIMA della standardizzazione per soggetto."""
+        f = self.features(x)                                   # (B, C, S, D)
+        if self.head_type == "pool_channel":
+            return f.mean(dim=2).flatten(1)                    # (B, C*D)
+        return f.mean(dim=(1, 2))                              # (B, D)
+
+    def forward(self, x: torch.Tensor, subj: torch.Tensor | None = None) -> torch.Tensor:
+        if self.norm is not None:
+            return self.classifier(self.norm(self.pooled_embedding(x), subj))
         return self.classifier(self.features(x))
 
 

@@ -18,7 +18,8 @@ def build_model(cfg, n_channels: int, n_samples: int, n_classes: int, fs: int = 
         model = CBraModClassifier(n_channels, n_samples, n_classes, head=cfg.hp("head", "all_patch_reps"),
                                   dropout=cfg.hp("dropout", 0.1),
                                   pretrained_path=pretrained_path if cfg.pretrained else None,
-                                  n_layer=cfg.hp("n_layer", 12))
+                                  n_layer=cfg.hp("n_layer", 12),
+                                  subj_embed_norm=cfg.hp("subj_embed_norm", "none"))
         if not cfg.pretrained and cfg.hp("init", "official") == "default":
             # variante diagnostica: init di default di PyTorch al posto di kaiming_normal(fan_out) del codice
             # ufficiale, che con la ricetta ufficiale fa divergere/collassare il training da zero

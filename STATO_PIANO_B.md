@@ -1,12 +1,12 @@
 # Stato del Piano B
 
-Ultimo aggiornamento: 2026-11-20 (sessione 01: pipeline completa su FACED per Kaggle, Proposta 1)
+Ultimo aggiornamento: 2026-11-25 (Sessione 02: ricetta a due fasi di CBraMod, pretraining su clip non viste, REVE-Base)
 
 ## Obiettivo
 
-**Perimetro attuale (decisione 2026-11-21):** l'unico dataset è FACED e l'unico foundation model è CBraMod.
-- MUSIN-G, NMED-T, EREMUS, SEED e REVE sono un'eventuale espansione successiva.
-- Nel codice restano solo come stub e hook dormienti, che nessuna coda usa: `DatasetAdapter`, `stimulus_holdout_plans`, stub REVE.
+**Perimetro attuale:** l'unico dataset è FACED. Foundation model: CBraMod e, dalla Sessione 02 (2026-11-25), REVE-Base.
+- MUSIN-G, NMED-T, EREMUS e SEED sono un'eventuale espansione successiva.
+- Nel codice restano solo come stub e hook dormienti, che nessuna coda usa: `DatasetAdapter`, `stimulus_holdout_plans`.
 
 Benchmark del riconoscimento delle emozioni da EEG su FACED (123 soggetti, 28 clip, 9 classi) con hold-out congiunto di soggetti e stimoli, foundation model (CBraMod) e allineamento per soggetto.
 
@@ -16,11 +16,97 @@ Contributo atteso:
 
 ## Passo corrente
 
-**Codice pronto e testato su dati sintetici.** Prossima azione dell'utente:
-1. scaricare FACED processed;
-2. packing e pesi;
-3. zip e upload;
-4. `nb0_smoke` su Kaggle, con l'output incollato in chat.
+**Sessione 02: codice pronto e testato su dati sintetici e CPU** (dettagli nella sezione "Sessione 02" più sotto).
+Prossime azioni dell'utente:
+1. ricostruire lo zip del codice;
+2. notebook F (coda `F`) su un account libero;
+3. notebook G (coda `G`) su un account dedicato, dopo aver creato il Secret `HF_TOKEN` e attivato Internet
+   (README_KAGGLE.md, sezione C2);
+4. notebook D: completare i 10 fold.
+
+## Sessione 02 (2026-11-25): ricetta a due fasi, pretraining su clip non viste, REVE-Base
+
+Prompt: `PROMPT_PIANOB-02_LPFT_pretraining.md`. Le quattro ipotesi primarie restano invariate. Le nuove analisi
+formano una **seconda famiglia** (aggiunta successiva, Holm solo su queste 4); tutto il resto è esplorativo:
+
+| | Ipotesi | Test |
+|---|---|---|
+| S1 | Il pretraining aiuta sulle clip **non viste** (ricette scelte in validation, regola di H1: `cbramod_ft_official` contro `cbramod_scratch_ft_warmup`) | Wilcoxon appaiato, bilaterale come H1 |
+| S2 | CBraMod a due fasi sulle clip non viste supera il caso | Wilcoxon unilaterale contro 1/9 |
+| S3 | REVE sulle clip non viste supera il caso | Wilcoxon unilaterale contro 1/9 |
+| S4 | REVE dipende dal contenuto fuori 4–30 Hz (banda piena − 4–30 Hz > 0, split FM) | Wilcoxon unilaterale |
+
+**Inventario della Parte B (righe valide negli zip, 23 soggetti):**
+
+| Config | split FM | T_k | LCO viste/non viste | parità di dati |
+|---|---|---|---|---|
+| `cbramod_ft_official` | 3 seed | sì | 5 seed × 3 fold | no |
+| `cbramod_ft_official_warmup` | 3 seed | sì | **no** | no |
+| `cbramod_lora_r2` | 3 seed | sì | 5 seed × 3 fold | 3 seed |
+| `cbramod_scratch_ft` (collassa) | 3 seed | sì (dalle predizioni) | no | no |
+| `cbramod_scratch_ft_warmup` | 3 seed | sì (dalle predizioni) | **no** | no |
+| `cbramod_scratch_ft_definit(_warmup)` | 1 seed | sì | no | no |
+
+Confermato: nessuna variante da zero ha righe di leave-clip-out; la coda F le aggiunge (3 seed ciascuna, insieme
+al pre-addestrato con warm-up).
+
+**Parte A — CBraMod a due fasi (LP poi FT, Kumar et al. 2022):**
+- Teste: `flat_official` (= la testa ufficiale), `pool_channel` (media sui patch per canale → 6400 → 256 → K),
+  `pool_global` (media su patch e canali → 200 → 256 → K).
+- Standardizzazione per soggetto degli embedding (solo teste a pooling): `session` (tutte le finestre del
+  soggetto, senza etichette, trasduttiva come EA), `heldout` (per i soggetti di test solo le clip fuori dal fold di
+  test, con asserzione). Statistiche: una volta in LP, all'inizio di ogni epoca FT (train) e prima di ogni
+  validation, poi sulla rete finale prima del test.
+- Ricetta `twophase`: AdamW wd 0.05, one-cycle per fase, label smoothing e warm-up da Optuna, batch 64, clipping
+  1.0 in FT, AMP + GradScaler; selezione sulla BA media per soggetto in validation tra le epoche FT, patience 10.
+- Optuna `cbramod_twophase`: 30 trial, spazio del prompt, Hyperband fino a 60 epoche globali (LP + FT).
+  `subj_embed_norm` è un parametro condizionale (solo teste a pooling).
+- Controllo di sanità nella coda: il primo job su split FM deve avere **BA di validation ≥ 0.20**; altrimenti
+  fallisce e i job della Parte A non partono. Si usa la validation, non il test, per non prendere decisioni sul test.
+- Ablazione A.4 (coda `F_bis`, 36 job): solo preparata. L'aggregatore stampa la decisione secondo la regola del
+  prompt (Wilcoxon unilaterale per soggetto contro 1/9, p < 0.05). Se Optuna sceglie già `flat_official`, la coda
+  usa la migliore configurazione con testa a pooling (`best_by_head` nel file dell'Optuna) e salta le due varianti
+  della standardizzazione. La coda si rigenera dopo aver copiato `hpo_best/cbramod_twophase.json` in `pianob/hpo/best/`.
+- Predizione per trial anche dalla media delle **log-probabilità**: nuova colonna `ba_trial_lp`; `ba_trial`
+  (media delle probabilità) resta invariata per non cambiare i risultati esistenti.
+
+**Parte C — REVE-Base dentro `pianob`:**
+- Codice vendorizzato dal repo ufficiale (commit `06a7059a`, MIT): encoder, backbone, `ReveClassifier` con
+  pooling "no", StableAdamW. Verificato su CPU: uscita **identica** al codice ufficiale con gli stessi pesi
+  (differenza 0 in eval, 1e-6 con il rumore sulle posizioni); StableAdamW identico dopo 25 passi.
+- Controlli §R10 superati con pesi casuali: 352 token, ingresso della testa 180.736, **1.807.881** parametri
+  allenabili in LP, encoder 69.2 M, conteggi 6720/1680/1932. Con i pesi veri li ripete il notebook G prima della coda.
+- Ricetta `reve_official`: porting di `dt.py` (LP 20 epoche lr 5e-3, FT 200 epoche lr 1e-4 dagli ultimi pesi di
+  LP, warm-up esponenziale 3/5 epoche, ReduceLROnPlateau sull'accuracy, selezione ed early stopping sulla BA pooled
+  di validation con patience > 10, mixup, clipping 2.0, fp16). Varianti di §R8: dropout 0.0, GradScaler spento,
+  niente LoRA (A, fedeli al codice); le varianti B (`reve_base_gradscaler`, `reve_base_yamldropout`) esistono ma
+  non sono in coda: si usano solo se il training è instabile, scegliendo in validation.
+- Scala: il loader dà dati/100; il modello moltiplica per 0.1, quindi REVE vede dati/1000 come nel codice.
+- **Ordine dei canali:** il codice di REVE (e quello di CBraMod) chiama le ultime due righe `A2, A1`. Per REVE si
+  usa quest'ordine (posizioni 3D). `faced_meta.CHANNELS` resta `A1, A2` per non cambiare TSception.
+- Rimozione dei canali: per REVE i canali si tolgono davvero, insieme alle posizioni. Anche CBraMod li toglie davvero
+  (la testa è dimensionata sul numero di canali), quindi la variante "stesso meccanismo di CBraMod" coincide.
+- Pesi: scaricati a ogni sessione con il Secret `HF_TOKEN` in `/tmp` (**deviazione**: il prompt diceva
+  `/kaggle/working`; lì finirebbero nell'output che ricarichi come Dataset, cioè una copia redistribuibile).
+  Revisione: risolta in un commit al download e annotata nei risultati; da qui Hugging Face non è raggiungibile,
+  quindi non l'ho potuta fissare prima. Caricamento strict; pesi mancanti = errore (§R8.9).
+- Riferimenti per i confronti: la scomposizione a parità di dati e la memorizzazione con permutati esistono solo
+  per CBraMod **LoRA**, quindi lì REVE si confronta con LoRA; altrove con la ricetta ufficiale.
+- Differenza nota dai dati del paper: i campioni oltre ±65 000 µV (saturazione del float16 in sub003/004/023/030,
+  soggetti di training) sono tagliati a 65 000.
+
+**Code e stime:**
+
+| Coda | Job | Contenuto, in ordine | Stima |
+|---|---|---|---|
+| `F` | 50 | Optuna (2 shard) → sanità → Parte A (18 + 12) → Parte B (18) | 1–2 sessioni |
+| `F_bis` | 36 | ablazione A.4, da lanciare solo se la regola lo dice | circa 1 sessione |
+| `G` | 119 | Gate R1 + R2 (6) → LCO (9) → permutati (6) → parità di dati (15) → bande (9) → canali (21) → valenza REVE e CBraMod (24) → R3 (5) → opzionali da zero e LoRA (24) | 3–4 sessioni; blocchi 1–4 nella prima |
+
+**[DA VERIFICARE] al primo job di REVE:** memoria GPU con batch 64 su T4 (su CPU il container ha esaurito la
+memoria con batch 64) e minuti per epoca (stime a priori: 45 min per job su split FM, 35 per fold LCO).
+
+
 
 ## Risultati parziali (notebook A, prima sessione, 2026-11-21)
 
@@ -319,6 +405,8 @@ Limite noto: gli iperparametri vengono da Optuna su split FM, che usa i soggetti
 
 ## Prossimi passi
 
+0. Sessione 02: notebook F (coda `F`), notebook G (coda `G`), poi `tools/aggregate.py` (sezione "Sessione 02":
+   seconda famiglia, regola A.4, REVE contro CBraMod, Gate R, tempi).
 1. Account 3 → notebook C (risultato centrale: CBraMod su stimoli nuovi).
 2. Account 1 → notebook D (10 fold, gate di potenza).
 3. Account 2 → dopo i risultati del notebook C, CBraMod sui 10 fold (coda da preparare).
@@ -421,7 +509,7 @@ Poi provare AMP disattivato (`hparams.amp=False`): la run ufficiale è in fp32.
 
 ## [DA VERIFICARE] sui dati veri / sulle fonti
 
-1. **Ordine A1/A2** (canali 31–32). Non è documentato; ininfluente per CBraMod, rilevante solo per la coppia TSception. I primi 30 canali seguono l'ordine di TorchEEG, che non è stato verificato sul file (i `.pkl` non hanno nomi di canale).
+1. **Ordine A1/A2** (canali 31–32). Non è documentato nel dataset; il codice ufficiale di REVE (e quello di CBraMod da cui deriva) usa `A2, A1` (aggiornato il 2026-11-25). Ininfluente per CBraMod; per REVE si usa l'ordine del suo codice; per TSception resta la nostra etichettatura (cambia solo il verso della coppia). I primi 30 canali seguono l'ordine di TorchEEG, che non è stato verificato sul file (i `.pkl` non hanno nomi di canale).
 2. **Unità dei `.pkl`** (attese in µV). `pack_faced.py` stampa la std mediana e la scrive in `meta.json`.
 3. **ID Synapse della cartella** `Processed_data` (`syn50615881` secondo TorchEEG).
 4. **Partizione a 10 fold di Xu & Plataniotis.** Implementata in modo sequenziale (9 × 12 + 15) come nel codice CLISA degli autori FACED (THU-EP), ma non verificata per FACED.
