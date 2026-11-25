@@ -167,6 +167,7 @@ soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binari
 | 14 | 24–25/11 | 2 / B (ripresa) | 21/21 | **Il crollo di CBraMod viene tutto da sotto 4 Hz**: passa-alto 4 Hz 0.177 (−38.0), passa-basso 30 Hz 0.567 (+1.0, n.s.). Non è EMG. Bordo frontale −1.0, temporale −1.5, casuali −0.1. |
 | 15 | 24–25/11 | 3 / E (ripresa) | 57/57 | **EEGNet originale + EA su clip nuove: 0.115 (al caso)**, viste 0.513, memorizzazione 38.0. Finestre da 4 s 0.264: il salto viene dalla finestra. 400 epoche: nessun cambiamento. TSception originale: 0.214 con EA (= nostro), clip nuove **0.143 (+3.2, p 0.001)**. |
 | 16 | 25/11 | 2 / E (ripresa) | 15/15 | **EEGNet+EA con solo 0–4 Hz: 0.450 (= banda piena 0.455)**; con 4–47 Hz 0.273 (−18.3, come le finestre da 4 s). Leave-clip-out a 4–47 Hz: clip nuove **0.136 (+2.5 sul caso, p 0.007; +2.1 sulla banda piena, p 0.03)**. |
+| 17 | 25/11 | 4 / B (ripresa) | 18/18 | **CBraMod con solo 0–4 Hz: 0.576 (≥ banda piena 0.555, p 0.05)**. Passa-alto 1 Hz 0.259, 2 Hz 0.201, 4 Hz 0.177: **circa 3/4 della caduta sta sotto 1 Hz**. Leave-clip-out a 4–47 Hz: clip nuove 0.119 (+0.8, n.s.). |
 
 **Risultati del notebook C (2026-11-24), 23 soggetti, caso 0.111:**
 - **Clip non viste (risultato centrale):**
@@ -228,6 +229,12 @@ soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binari
 - Solo 4–47 Hz: 0.273 (−18.3, peggiorano 22 soggetti su 23), uguale alle finestre da 4 s (0.264, differenza n.s.). **Il vantaggio delle finestre lunghe è proprio il contenuto lento.**
 - Leave-clip-out a 4–47 Hz: viste 0.322, **non viste 0.136 (+2.5 sul caso, p 0.007)**, contro 0.115 a banda piena (+2.1, p 0.03). Tolta l'impronta lenta della clip, la generalizzazione a clip nuove compare, piccola, al livello dei modelli compatti (TSception 0.130, differenza n.s.).
 - Resta un divario viste/non viste di 18.6 punti: in coda 2 modelli permutati per fold a 4–47 Hz per dire quanto è ancora memorizzazione.
+
+**Notebook B, bande (sessione 17, CBraMod LoRA, 3 seed):**
+- Solo 0–4 Hz: **0.576**, anzi leggermente sopra la banda piena (+1.9, p 0.05). Tutto quello che CBraMod usa sta sotto 4 Hz.
+- Soglia del passa-alto: 1 Hz 0.259 (−29.7), 2 Hz 0.201 (−35.6), 4 Hz 0.177 (−38.0). **Circa il 78% della caduta viene dalla banda 0.05–1 Hz** (i dati FACED processed partono da 0.05 Hz, con ICA oculare e riferimento medio).
+- Leave-clip-out a 4–47 Hz: viste 0.186, **non viste 0.119 (+0.8, n.s.)**. A differenza di EEGNet (0.136, +2.5), CBraMod senza contenuto lento non generalizza; la differenza tra i due (−1.6) però non è significativa (p 0.14).
+- **Lettura:** l'"impronta" della clip è un segnale molto lento (sotto 1 Hz) dentro la finestra da 10 s: derive, potenziali lenti, residui oculari sfuggiti all'ICA. [DA VERIFICARE] l'ordine di presentazione delle clip in FACED: se è fisso o a blocchi, la deriva lenta nella sessione può codificare la posizione della clip (confondente temporale tipico dei disegni a blocchi).
 
 - Correzione al riepilogo: il JSON compatto poteva riportare i test di permutazione dei job invalidati (i record per job non avevano l'orario). Ora ogni record ha l'orario e i vecchi lo prendono dal file `done`; le tabelle per soggetto erano già corrette.
 

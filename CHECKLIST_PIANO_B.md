@@ -120,6 +120,7 @@ Atteso, da Xu & Plataniotis (encoder contrastivi): calo da 2.2 a 44.4 punti, cor
 | 🆕 **EEGNet originale + EA** | 0.513 | **0.115** | 39.8 | +0.4 (p 0.32) | **38.0** | +1.8 (p 0.04) |
 | 🆕 TSception originale + EA | 0.234 | **0.143** | 9.1 | **+3.2 (p 0.001)** | 12.0 | −2.9 |
 | 🆕 EEGNet originale + EA, 4–47 Hz | 0.322 | **0.136** | 18.6 | **+2.5 (p 0.007)** | ⏳ | ⏳ |
+| 🆕 CBraMod LoRA, 4–47 Hz | 0.186 | 0.119 | 6.7 | +0.8 (n.s.) | — | — |
 | TSception + EA | 0.247 | 0.130 | 11.7 | +1.8 (p 0.01) | 14.2 | −2.5 |
 | **CBraMod, ricetta ufficiale** | 0.588 | **0.111** | **47.8** | −0.05 (p 0.94) | — | — |
 | **CBraMod LoRA** | 0.558 | **0.112** | **44.6** | +0.1 (p 0.94) | **44.5** | +0.1 |
@@ -154,6 +155,8 @@ Atteso: dipendenza dall'EMG per i modelli deep moderni, non quantificata in lett
 | 4–30 Hz senza 8 casuali | 0.214 | 0.179 |
 | 🆕 Solo passa-alto 4 Hz (4–47) | 0.195 (−1.7, n.s.) | **0.177 (−38.0)** |
 | 🆕 Solo passa-basso 30 Hz (0–30) | 0.227 (+1.4, n.s.) | 0.567 (+1.0, n.s.) |
+| 🆕 Solo 0–4 Hz | — | **0.576 (+1.9, p 0.05)** |
+| 🆕 Passa-alto 1 Hz / 2 Hz | — | 0.259 (−29.7) / 0.201 (−35.6) |
 | 🆕 Senza bordo frontale (Fp1, Fp2, F7, F8) | — | 0.547 (−1.0, n.s.) |
 | 🆕 Senza bordo temporale (FC5, FC6, T7, T8) | — | 0.542 (−1.5, p 0.005) |
 | 🆕 Senza 4 canali casuali | — | 0.556 (−0.1) |
@@ -221,7 +224,7 @@ Anche per la valenza il vantaggio sopra il caso dipende dalle clip condivise.
 | 1 | ✅ Fatto (account 2, notebook C, 15 job) | CBraMod LoRA con EA e con z-score (scala robusta) | Impara; EA −16.0, z-score −1.7 | H2 non si estende al foundation model |
 | 2 | ✅ Fatto (account 2, notebook B) | Solo passa-alto 4 Hz e solo passa-basso 30 Hz | CBraMod −38.0 e +1.0 | L'informazione di CBraMod è sotto 4 Hz, non EMG |
 | 3 | ✅ Fatto (account 2, notebook B) | Bordo frontale / temporale / 4 casuali | −1.0 / −1.5 / −0.1 | Nessun contributo oculare specifico |
-| 8 | Account 2, notebook B ripreso (18 job, circa 3.5 h) | CBraMod LoRA: leave-clip-out a 4–47 Hz (3 seed); solo 0–4 Hz, passa-alto 1 Hz e 2 Hz (3 seed) | Clip non viste senza contenuto lento; BA con solo 0–4 Hz; dove cade la soglia | Tolta l'impronta lenta della clip, emerge una generalizzazione? Quanto della BA sta in 0–4 Hz? |
+| 8 | ✅ Fatto (account 4, notebook B, 18 job): solo 0–4 Hz 0.576; passa-alto 1 Hz 0.259; clip nuove a 4–47 Hz 0.119 (n.s.) | CBraMod LoRA: leave-clip-out a 4–47 Hz (3 seed); solo 0–4 Hz, passa-alto 1 Hz e 2 Hz (3 seed) | Clip non viste senza contenuto lento; BA con solo 0–4 Hz; dove cade la soglia | Tolta l'impronta lenta della clip, emerge una generalizzazione? Quanto della BA sta in 0–4 Hz? |
 | 4 | Account 1, notebook D (330 job, circa 2 sessioni) | TSception, DE, DE+z-score su `lnso10`, `lnso10_lco`, `lnso10_sizematched` (+ permutati); EMG facoltativo | Effetto minimo rilevabile su 123 soggetti; clip non viste contro il caso; scomposizione | Gate di potenza; generalizzazione reale a stimoli nuovi (+1.8 su split FM, al limite) |
 | 6 | ✅ Fatto (account 3, notebook E, 33 job) | EEGNet originale, framework CBraMod, originale + EA | 0.257 / 0.222 / **0.455**; clip non viste al caso senza EA | Il divario con lo 0.409 viene da finestra e allineamento, non dalla ricetta CBraMod |
 | 9 | ✅ Fatto (notebook E, 15 job): solo 0–4 Hz 0.450 (= piena), 4–47 Hz 0.273; clip nuove a 4–47 Hz 0.136 (+2.5) | EEGNet originale + EA: passa-alto 4 Hz e solo 0–4 Hz (3 seed); leave-clip-out a 4–47 Hz (3 seed) | Il +19 delle finestre da 10 s viene dal contenuto lento? | Anche il miglior compatto usa la stessa impronta lenta di CBraMod? |
@@ -255,7 +258,8 @@ Su FACED la BA pubblicata dei foundation model (circa 0.55) e quella dei modelli
 - su clip mai viste CBraMod è al caso e i modelli compatti superano il caso di 1–3 punti;
 - la riduzione dei dati spiega al massimo il 20% del calo;
 - il pretraining non dà un vantaggio significativo;
-- CBraMod ed EEGNet+EA traggono tutta la loro accuratezza dal contenuto sotto 4 Hz, non dall'EMG; le finestre lunghe servono proprio a vederlo;
+- CBraMod ed EEGNet+EA traggono tutta la loro accuratezza dal contenuto sotto 4 Hz (per CBraMod soprattutto sotto 1 Hz), non dall'EMG; le finestre lunghe servono proprio a vederlo;
+- [DA VERIFICARE] l'ordine di presentazione delle clip in FACED (possibile confondente temporale della deriva lenta);
 - tolto il contenuto sotto 4 Hz, EEGNet+EA generalizza a clip nuove un poco (+2.5), come i modelli compatti;
 - **più un modello è accurato sulle clip condivise, meno generalizza a quelle nuove:** CBraMod 0.557 → 0.112, EEGNet originale + EA 0.455 → 0.115, TSception 0.214 → 0.143, DE + z-score 0.232 → 0.145;
 - le baseline compatte erano in parte sotto-ottimizzate (EEGNet, per la finestra), ma il quadro su clip nuove non cambia.
