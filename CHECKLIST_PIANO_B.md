@@ -259,7 +259,7 @@ Su FACED la BA pubblicata dei foundation model (circa 0.55) e quella dei modelli
 - la riduzione dei dati spiega al massimo il 20% del calo;
 - il pretraining non dà un vantaggio significativo;
 - CBraMod ed EEGNet+EA traggono tutta la loro accuratezza dal contenuto sotto 4 Hz (per CBraMod soprattutto sotto 1 Hz), non dall'EMG; le finestre lunghe servono proprio a vederlo;
-- [DA VERIFICARE] l'ordine di presentazione delle clip in FACED (possibile confondente temporale della deriva lenta);
+- l'ordine delle clip è randomizzato tra i soggetti (paper FACED): il segnale lento è agganciato al contenuto della clip, non alla posizione nella sessione;
 - tolto il contenuto sotto 4 Hz, EEGNet+EA generalizza a clip nuove un poco (+2.5), come i modelli compatti;
 - **più un modello è accurato sulle clip condivise, meno generalizza a quelle nuove:** CBraMod 0.557 → 0.112, EEGNet originale + EA 0.455 → 0.115, TSception 0.214 → 0.143, DE + z-score 0.232 → 0.145;
 - le baseline compatte erano in parte sotto-ottimizzate (EEGNet, per la finestra), ma il quadro su clip nuove non cambia.
