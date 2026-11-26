@@ -22,9 +22,7 @@ Prossime azioni dell'utente:
 2. notebook F (coda `F`) su un account libero;
 3. notebook G (coda `G`) su un account dedicato, dopo aver creato il Secret `HF_TOKEN` e attivato Internet
    (README_KAGGLE.md, sezione C2);
-4. notebook D: restano solo i 15 fold mancanti di CBraMod sul leave-clip-out (circa 5.5 ore di GPU, meno di 3 con 2 worker).
-   L'ultima sessione girava con il codice `6bc17f4`, che non li aveva in coda: serve lo zip del codice aggiornato,
-   con in input l'output di `results_rotation_nbD_2`.
+4. notebook D: ✅ completato il 2026-11-27 (360/360).
 
 ## Sessione 02 (2026-11-25): ricetta a due fasi, pretraining su clip non viste, REVE-Base
 
@@ -259,6 +257,7 @@ soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binari
 | 18 | 25–26/11 | 3 / D (ripresa) | 211/330 | **Gate di potenza passato**: effetto minimo rilevabile 1.5 punti su 123 soggetti. TSception sui 10 fold 0.259; **clip nuove 0.145 (+3.4 sul caso, p 1e-17)**. Scomposizione su 123 soggetti: dati +2.4, stimolo visto corretto −0.4 (IC95 −1.5/+0.7). CBraMod LoRA sui 10 fold 0.670; clip nuove (60 soggetti, 1 seed) 0.122. |
 | 19 | 26/11 | 4 / E (ripresa) | 6/6 | Permutati di EEGNet + EA a 4–47 Hz: memorizzazione 22.3 (contro 38.0 a banda piena); divario viste/non viste interamente memorizzazione (corretto −3.7); le clip nuove a 0.136 (+2.5) restano una generalizzazione reale. |
 | 20 | 26/11 | rotazione / D (ripresa) | 345/360 | **DE + z-score sulle clip nuove: 0.166 (+5.5 sul caso), meglio di TSception (+2.1, p 4e-6) e di CBraMod (+5.8 su 60 soggetti)**. Permutati di TSception: memorizzazione 15.7, corretto −2.1. DE + z-score: scomposizione corretta −1.7. ΔEMG TSception su 123 soggetti +1.4 (p 0.001). Restano 15 fold di CBraMod (codice vecchio). |
+| 21 | 27/11 | S edge 2 / D (ripresa) | 15/15 | **CBraMod LoRA sulle clip nuove con 123 soggetti: viste 0.696, nuove 0.124 (+1.3 sul caso, p 1e-4)**: con piena potenza un residuo minimo sopra il caso, sotto TSception (−2.1) e DE + z-score (−4.2). Solo 2 fold su 30 superano il test di permutazione interno. Notebook D completo. |
 
 **Risultati del notebook C (2026-11-24), 23 soggetti, caso 0.111:**
 - **Clip non viste (risultato centrale):**
@@ -345,7 +344,7 @@ soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binari
 - **Scomposizione a parità di dati, TSception, 123 soggetti:** BA_full 0.259, BA_size 0.235, BA_unseen 0.145, BA_size permutato 0.205. Quantità di dati +2.4 (p 2e-8); stimolo visto +9.0; **corretto per permutazione −0.4 (IC95 −1.5/+0.7, p 0.60)**. Con piena potenza il vantaggio delle clip viste, a parità di dati, è tutto memorizzazione (H3 per TSception: zero con intervallo stretto).
 - **CBraMod LoRA sulle clip nuove (60 soggetti, 15 fold su 30, 1 seed, dalla prima sessione con codice vecchio):** viste 0.757, non viste 0.122 (+1.1, p 0.04 unilaterale). Sugli stessi 60 soggetti TSception fa meglio sulle clip nuove (+2.8, p 7e-5). Aggiunti alla coda D i 15 fold mancanti, per avere CBraMod su tutti i 123 soggetti.
 - BN-α (TSception): +2.8 sui 10 fold, +0.9 sulle clip nuove. DE + z-score contro DE: +7.9.
-**Notebook D, seconda sessione (sessione 20, codice `6bc17f4`, coda terminata: 345 job su 360, nessun errore).** Mancano solo i 15 fold di CBraMod sul leave-clip-out aggiunti dopo (`a984d41`).
+**Notebook D, seconda sessione (sessione 20, codice `6bc17f4`, coda terminata: 345 job su 360, nessun errore).** I 15 fold mancanti di CBraMod sul leave-clip-out sono arrivati nella sessione 21 (codice `d780163`): notebook D completo, 360/360.
 
 Clip nuove con 123 soggetti (BA per finestra, media per soggetto; CBraMod su 60 soggetti):
 
@@ -354,9 +353,9 @@ Clip nuove con 123 soggetti (BA per finestra, media per soggetto; CBraMod su 60 
 | DE + z-score per soggetto (regressione logistica) | 0.323 | **0.166** | **+5.5** (IC95 +4.7/+6.3, p 9e-19) | 17.0 |
 | TSception + EA + BN-α (sessione) | 0.310 | 0.154 | +4.3 (p 6e-20) | — |
 | TSception + EA (3 seed) | 0.281 | 0.145 | +3.4 (p 1e-17) | 15.7 |
-| CBraMod LoRA (1 seed, 60 soggetti) | 0.757 | 0.122 | +1.1 (p 0.04) | — |
+| CBraMod LoRA (1 seed, 123 soggetti) | 0.696 | 0.124 | +1.3 (IC95 +0.7/+2.0, p 1e-4; peggiorano 40% dei soggetti) | — |
 
-- **Su stimoli nuovi la classifica si rovescia.** Il modello più semplice generalizza di più. DE + z-score batte TSception sulle clip nuove (+2.1, IC95 +1.3/+2.9, p 4e-6; +1.2 anche contro TSception con BN-α) e CBraMod (+5.8 sugli stessi 60 soggetti, p 1e-8). Le feature DE partono da 1 Hz (bande 1–4 … 30–45 Hz, varianza su segmenti da 1 s), quindi non vedono l'impronta lenta sotto 1 Hz che CBraMod usa.
+- **Su stimoli nuovi la classifica si rovescia.** Il modello più semplice generalizza di più. DE + z-score batte TSception sulle clip nuove (+2.1, IC95 +1.3/+2.9, p 4e-6; +1.2 anche contro TSception con BN-α) e CBraMod (+4.2, IC95 +3.2/+5.1, p 3e-12, 123 soggetti). Anche TSception batte CBraMod sulle clip nuove (+2.1, p 6e-6). Le feature DE partono da 1 Hz (bande 1–4 … 30–45 Hz, varianza su segmenti da 1 s), quindi non vedono l'impronta lenta sotto 1 Hz che CBraMod usa.
 - Il permutation test interno di DE + z-score (20 permutazioni per fold) è al minimo possibile (p 0.048) in 25 fold su 30. Il z-score del soggetto di test usa tutte le sue finestre senza label: è trasduttivo come l'EA, senza fughe di label.
 - **Il vantaggio delle clip viste resta tutto memorizzazione, per entrambe le famiglie di modelli.** Indice appaiato corretto: TSception −2.1 (p 2e-5), DE + z-score −1.25 (p 6e-4). Scomposizione a parità di dati: TSception −0.3 (IC95 −1.5/+0.8, n.s.), DE + z-score −1.7 (IC95 −2.5/−0.9). La quantità di dati pesa +2.4 per TSception e +0.6 (n.s.) per DE + z-score. Il segno negativo indica che memorizzazione ed emozione non si sommano: con label permutate TSception riconosce già le clip viste a 0.268, contro 0.281 con le label vere.
 - **EMG con TSception su 123 soggetti (1 seed, 2 estrazioni casuali):**
