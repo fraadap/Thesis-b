@@ -185,6 +185,33 @@ def exploratory(df) -> dict:
     return out
 
 
+def unseen_lnso10(df) -> dict:
+    """Clip nuove con 123 soggetti (lnso10_lco): ogni modello contro il caso (unilaterale) e confronti appaiati;
+    ΔEMG di TSception (4-30 Hz senza 8 canali casuali - senza bordo, media delle 2 estrazioni)."""
+    out = {}
+    models = ["de_asym_lr_zsub", "tsception_ea", "cbramod_lora_r2"]
+    ser = {m: subj_series(df, m, protocol="lnso10_lco", cond="unseen") for m in models}
+    ser["tsception_ea_bnalpha"] = subj_series(df, "tsception_ea_bnalpha", protocol="lnso10_lco",
+                                              variant="bnalpha_session_n0sel", cond="unseen")
+    for m, s in ser.items():
+        if s is not None:
+            out[f"{m} non viste > caso"] = paired_test(s.values, np.full(len(s), 1 / 9), alternative="greater")
+    for a, b in [("de_asym_lr_zsub", "tsception_ea"), ("de_asym_lr_zsub", "tsception_ea_bnalpha"),
+                 ("de_asym_lr_zsub", "cbramod_lora_r2"), ("tsception_ea", "cbramod_lora_r2")]:
+        sa, sb = ser[a], ser[b]
+        if sa is not None and sb is not None:
+            idx = sa.index.intersection(sb.index)
+            out[f"{a} vs {b} (non viste)"] = paired_test(sa[idx].values, sb[idx].values)
+    ne = subj_series(df, "tsception_ea", protocol="lnso10", variant="bp4-30_noedge")
+    r8 = [subj_series(df, "tsception_ea", protocol="lnso10", variant=f"bp4-30_rand8d{d}") for d in (0, 1)]
+    if ne is not None and all(r is not None for r in r8):
+        r = sum(r8) / len(r8)
+        idx = ne.index.intersection(r.index)
+        out["ΔEMG tsception_ea lnso10 (senza 8 casuali - senza bordo, 4-30 Hz)"] = paired_test(
+            r[idx].values, ne[idx].values, alternative="greater")
+    return out
+
+
 def power_gate(df, a="tsception_ea", b="de_asym_lr") -> dict:
     """Dopo lnso10: SD delle differenze appaiate per soggetto -> effetto minimo rilevabile (n = 123)."""
     sa, sb = subj_series(df, a, protocol="lnso10"), subj_series(df, b, protocol="lnso10")
@@ -291,6 +318,12 @@ def main():
     md.append("\n## Confronti esplorativi (non corretti)\n")
     for k, v in exploratory(df).items():
         md.append(f"- {k}: diff {v['mean_diff']:.4f}, dz {v.get('dz', np.nan):.2f}, p {v.get('p', np.nan):.4g} ({v.get('test')}), n {v['n']}")
+    un = unseen_lnso10(df)
+    if un:
+        md.append("\n## Clip nuove e EMG con 123 soggetti (lnso10, esplorativo)\n")
+        for k, v in un.items():
+            md.append(f"- {k}: diff {v['mean_diff']:+.4f}, IC95 {np.round(v['ci95'], 4).tolist()}, "
+                      f"peggiorati {v['frac_worse']:.2f}, p {v['p']:.3g} ({v['test']}), n {v['n']}")
     md.append(f"\n## Gate di potenza (lnso10)\n\n{power_gate(df)}\n")
     probes = {j["job_id"]: j["clip_probe"] for j in jobs if "clip_probe" in j}
     for c in compact:

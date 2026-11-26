@@ -47,7 +47,7 @@ Aggiornata il 2026-11-24, dopo il notebook C. Fonte dei numeri: `tools/aggregate
 |---|---|---|
 | `split_fm` (sub000–079 / 080–099 / 100–122) | Confronto con la letteratura | ✅ |
 | `split_fm_lco` (3 fold di clip, clip viste / non viste) | Indice di scorciatoia dello stimolo | ✅ |
-| `lnso10`, `lnso10_lco` | Claim principali con 123 soggetti | TSception: clip nuove +3.4 (p 1e-17), stimolo visto corretto −0.4 (IC95 −1.5/+0.7). CBraMod: 15/30 fold di leave-clip-out (+1.1 su 60 soggetti), gli altri 15 in coda | 🔀 quasi completo |
+| `lnso10`, `lnso10_lco` | Claim principali con 123 soggetti | Clip nuove: DE + z-score +5.5, TSception +3.4 (p 1e-17), CBraMod +1.1 (60 soggetti). Stimolo visto corretto: TSception −0.3 (IC95 −1.5/+0.8), DE + z-score −1.7. CBraMod: 15/30 fold di leave-clip-out, gli altri 15 in coda (serve il codice aggiornato) | 🔀 quasi completo |
 | **`split_fm_sizematched` / `lnso10_sizematched`** | Non previsti | 🆕 su richiesta: separano quantità di dati e novità dello stimolo, valutati sugli stessi esempi del leave-clip-out |
 | Condizioni `tk0..2` su split FM | Non previste | 🆕 BA con clip condivise sulle clip tenute fuori, necessaria alla scomposizione (ricavata anche dalle predizioni salvate dei job vecchi) |
 | Correzione per permutazione del Δstim | Δcorr = Δraw − Δperm | 🔀 **Formula distorta.** Con label permutate le clip non viste scendono sotto il caso per costruzione (2/27 = 0.074). Adottata la correzione rispetto al caso: Δraw − (BA_viste^perm − 1/K); il valore originale resta riportato per trasparenza |
@@ -160,11 +160,11 @@ Atteso: dipendenza dall'EMG per i modelli deep moderni, non quantificata in lett
 | 🆕 Senza bordo frontale (Fp1, Fp2, F7, F8) | — | 0.547 (−1.0, n.s.) |
 | 🆕 Senza bordo temporale (FC5, FC6, T7, T8) | — | 0.542 (−1.5, p 0.005) |
 | 🆕 Senza 4 canali casuali | — | 0.556 (−0.1) |
-| H4 (casuali − bordo, a 4–30 Hz) | +0.4 (n.s.) | **+2.0 (p 0.007)** |
+| H4 (casuali − bordo, a 4–30 Hz) | +0.4 (n.s.); 🆕 **+1.4 (p 0.001) su 123 soggetti** | **+2.0 (p 0.007)** |
 | Recall per classe | amusement −5, disgust +8 | crollo uniforme su tutte le classi |
 
 **Esito:**
-- TSception non dipende né dalla banda né dal bordo.
+- TSception non usa nulla fuori 4–30 Hz (banda piena = 4–30 Hz senza canali casuali, anche su 123 soggetti). Con 123 soggetti emerge un piccolo contributo del bordo a 4–30 Hz (+1.4, p 0.001; esplorativo), invisibile su split FM.
 - **CBraMod: tutta l'informazione sta sotto 4 Hz.** Togliere sopra 30 Hz (dove sta l'EMG) non costa nulla; togliere sotto 4 Hz costa 38 punti. Il crollo uniforme sulle classi è coerente.
 - Il bordo pesa poco e in modo distribuito (frontale −1.0, temporale −1.5): nessuna traccia oculare specifica nei canali Fp1/Fp2.
 - Con le clip nuove al caso, il contenuto sotto 4 Hz è specifico della clip (potenziali lenti agganciati al video, movimenti oculari, deriva). ⏳ Leave-clip-out a 4–47 Hz e bande 0–4 / 1–47 / 2–47.
@@ -201,8 +201,8 @@ H3 e H4 sono valutate sul modello migliore, CBraMod LoRA, come previsto dal pian
 |---|---|---|---|---|
 | H1: il pretraining aiuta | +2.8 (paper) | +0.8 (ricette scelte in validation) | 0.21 | ❌ non confermata |
 | H2: l'allineamento aiuta | sì | +8.4 (TSception) | 2e-6 | ✅ confermata per TSception; **non si estende a CBraMod** (EA −16.0, z-score −1.7; esplorativo) |
-| H3: stimolo visto, corretto > 0 | > 0 | +2.2 (CBraMod); −1.9 (TSception) | 0.022 | ✅ in senso statistico, ma **non si trasferisce a stimoli nuovi** |
-| H4: bordo/EMG oltre il controllo | > 0 | +2.0 (CBraMod); n.s. (TSception) | 0.022 | ✅ in senso statistico; **ma CBraMod non usa l'EMG** (passa-basso 30 Hz +1.0): usa il contenuto sotto 4 Hz |
+| H3: stimolo visto, corretto > 0 | > 0 | +2.2 (CBraMod); −1.9 (TSception); su 123 soggetti TSception −0.3 (n.s.), DE + z-score −1.7 | 0.022 | ✅ in senso statistico, ma **non si trasferisce a stimoli nuovi** |
+| H4: bordo/EMG oltre il controllo | > 0 | +2.0 (CBraMod); TSception n.s. su split FM, +1.4 (p 0.001) su 123 soggetti | 0.022 | ✅ in senso statistico; **ma CBraMod non usa l'EMG** (passa-basso 30 Hz +1.0): usa il contenuto sotto 4 Hz |
 
 ---
 
@@ -225,7 +225,7 @@ Anche per la valenza il vantaggio sopra il caso dipende dalle clip condivise.
 | 2 | ✅ Fatto (account 2, notebook B) | Solo passa-alto 4 Hz e solo passa-basso 30 Hz | CBraMod −38.0 e +1.0 | L'informazione di CBraMod è sotto 4 Hz, non EMG |
 | 3 | ✅ Fatto (account 2, notebook B) | Bordo frontale / temporale / 4 casuali | −1.0 / −1.5 / −0.1 | Nessun contributo oculare specifico |
 | 8 | ✅ Fatto (account 4, notebook B, 18 job): solo 0–4 Hz 0.576; passa-alto 1 Hz 0.259; clip nuove a 4–47 Hz 0.119 (n.s.) | CBraMod LoRA: leave-clip-out a 4–47 Hz (3 seed); solo 0–4 Hz, passa-alto 1 Hz e 2 Hz (3 seed) | Clip non viste senza contenuto lento; BA con solo 0–4 Hz; dove cade la soglia | Tolta l'impronta lenta della clip, emerge una generalizzazione? Quanto della BA sta in 0–4 Hz? |
-| 4 | 🔀 Notebook D: 211/330 fatti (gate di potenza passato); restano permutati, CBraMod LCO (15, aggiunti), DE + z-score, EMG. 1 sessione | TSception, DE, DE+z-score su `lnso10`, `lnso10_lco`, `lnso10_sizematched` (+ permutati); EMG facoltativo | Effetto minimo rilevabile su 123 soggetti; clip non viste contro il caso; scomposizione | Gate di potenza; generalizzazione reale a stimoli nuovi (+1.8 su split FM, al limite) |
+| 4 | 🔀 Notebook D: 345/360 fatti; restano i 15 fold di CBraMod sul leave-clip-out (codice da ricostruire, circa 3 h con 2 worker) | TSception, DE, DE+z-score su `lnso10`, `lnso10_lco`, `lnso10_sizematched` (+ permutati); EMG facoltativo | Effetto minimo rilevabile su 123 soggetti; clip non viste contro il caso; scomposizione | Gate di potenza; generalizzazione reale a stimoli nuovi (+1.8 su split FM, al limite) |
 | 6 | ✅ Fatto (account 3, notebook E, 33 job) | EEGNet originale, framework CBraMod, originale + EA | 0.257 / 0.222 / **0.455**; clip non viste al caso senza EA | Il divario con lo 0.409 viene da finestra e allineamento, non dalla ricetta CBraMod |
 | 9 | ✅ Fatto (notebook E, 15 job): solo 0–4 Hz 0.450 (= piena), 4–47 Hz 0.273; clip nuove a 4–47 Hz 0.136 (+2.5) | EEGNet originale + EA: passa-alto 4 Hz e solo 0–4 Hz (3 seed); leave-clip-out a 4–47 Hz (3 seed) | Il +19 delle finestre da 10 s viene dal contenuto lento? | Anche il miglior compatto usa la stessa impronta lenta di CBraMod? |
 | 7 | ✅ Fatto (account 3, notebook E, 57 job) | EEGNet originale + EA: leave-clip-out + 2 permutati, a parità di dati + 2 permutati, finestre da 4 s, 400 epoche. TSception originale (Ding 2022, 10 s) con e senza EA su split FM; con EA anche su leave-clip-out + 2 permutati | Clip non viste contro il caso; scomposizione; effetto della finestra | **Il miglior modello compatto (0.455) generalizza a stimoli nuovi?** H3 sul compatto |
@@ -242,7 +242,7 @@ Anche per la valenza il vantaggio sopra il caso dipende dalle clip condivise.
 
 **Archiviato:** emozione contro retrieval nello spazio latente → `IDEE_ARCHIVIATE.md`.
 
-**Fuori perimetro:** altri dataset, REVE, Proposte 2–3, preprocessing dai raw.
+**Fuori perimetro:** altri dataset, Proposte 2–3, preprocessing dai raw.
 
 ---
 
@@ -265,5 +265,7 @@ Su FACED la BA pubblicata dei foundation model (circa 0.55) e quella dei modelli
 - CBraMod ed EEGNet+EA traggono tutta la loro accuratezza dal contenuto sotto 4 Hz (per CBraMod soprattutto sotto 1 Hz), non dall'EMG; le finestre lunghe servono proprio a vederlo;
 - l'ordine delle clip è randomizzato tra i soggetti (paper FACED): il segnale lento è agganciato al contenuto della clip, non alla posizione nella sessione;
 - tolto il contenuto sotto 4 Hz, EEGNet+EA generalizza a clip nuove un poco (+2.5), come i modelli compatti;
-- **più un modello è accurato sulle clip condivise, meno generalizza a quelle nuove:** CBraMod 0.557 → 0.112, EEGNet originale + EA 0.455 → 0.115, TSception 0.214 → 0.143, DE + z-score 0.232 → 0.145;
+- **più un modello è accurato sulle clip condivise grazie al contenuto lento, meno generalizza a quelle nuove:** CBraMod 0.557 → 0.112, EEGNet originale + EA 0.455 → 0.115, TSception 0.214 → 0.143, DE + z-score 0.232 → 0.145;
+- **su 123 soggetti il modello che generalizza di più è il più semplice:** DE + z-score per soggetto con regressione logistica, clip nuove 0.166 (+5.5 sul caso), contro TSception 0.145 (+3.4) e CBraMod 0.122 (+1.1, 60 soggetti). Le sue feature partono da 1 Hz e non vedono l'impronta lenta;
+- per tutte le famiglie di modelli il vantaggio delle clip viste, a parità di dati, è memorizzazione (corretto ≤ 0 con intervalli stretti);
 - le baseline compatte erano in parte sotto-ottimizzate (EEGNet, per la finestra), ma il quadro su clip nuove non cambia.
