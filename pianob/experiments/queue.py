@@ -328,6 +328,10 @@ def queue_nbD() -> list[Job]:
     # (3) quantità di dati vs novità dello stimolo (H3) + permutazioni a livello di clip per le correzioni
     J += sizematched_jobs("tsception_ea", [0], draws=[0], n_perm_models=1, protocol="lnso10_sizematched")
     J += perm_jobs("tsception_ea", "lnso10_lco", perms=[0])
+    # (3b) aggiunta 2026-11-26: CBraMod LoRA sul leave-clip-out dei 10 fold. La prima sessione (codice vecchio)
+    # ne ha completati 15 su 30 (soggetti 0-59: clip nuove 0.122, +1.1 sul caso, p 0.04): si completano gli
+    # altri 15 per avere CBraMod sulle clip nuove con tutti i 123 soggetti (i 15 fatti vengono saltati)
+    J += train_jobs("cbramod_lora_r2", ["lnso10_lco"], [0])
     # (4) feature (CPU): leave-clip-out e controllo della quantità di dati con permutazioni interne
     J += [Job("train", c, "lnso10_lco", f, 0, n_perm=20) for c in ("de_asym_lr_zsub",)
           for f in _folds("lnso10_lco")]

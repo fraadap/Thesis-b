@@ -24,7 +24,7 @@ Aggiornata il 2026-11-24, dopo il notebook C. Fonte dei numeri: `tools/aggregate
 |---|---|---|---|
 | Gate 1: riproduzione CBraMod | BA pooled entro circa 2 punti da 0.5509 (3 seed) | **0.5579** (0.561 / 0.555 / 0.558); κ 0.500 (paper 0.504); F1w 0.563 (paper 0.562) | ✅ passato |
 | Gate 2: pipeline completa su split FM + leave-clip-out | Tutte le config tranne REVE, con tabelle e indici | Tutte eseguite; CBraMod con EA / z-score ripetuto con la scala robusta | ✅ completo |
-| Gate di potenza | Dopo `lnso10` per 2 config: effetto minimo rilevabile ≤ 2 punti | Stima preliminare su 23 soggetti: 1.1–3.7 punti; proiezione su 123: 0.5–1.5 punti | ⏳ notebook D |
+| Gate di potenza | Dopo `lnso10` per 2 config: effetto minimo rilevabile ≤ 2 punti | **1.5 punti** (TSception contro DE, 123 soggetti) | ✅ passato |
 
 ---
 
@@ -47,7 +47,7 @@ Aggiornata il 2026-11-24, dopo il notebook C. Fonte dei numeri: `tools/aggregate
 |---|---|---|
 | `split_fm` (sub000–079 / 080–099 / 100–122) | Confronto con la letteratura | ✅ |
 | `split_fm_lco` (3 fold di clip, clip viste / non viste) | Indice di scorciatoia dello stimolo | ✅ |
-| `lnso10`, `lnso10_lco` | Claim principali con 123 soggetti | ⏳ notebook D (modelli compatti); CBraMod da decidere |
+| `lnso10`, `lnso10_lco` | Claim principali con 123 soggetti | TSception: clip nuove +3.4 (p 1e-17), stimolo visto corretto −0.4 (IC95 −1.5/+0.7). CBraMod: 15/30 fold di leave-clip-out (+1.1 su 60 soggetti), gli altri 15 in coda | 🔀 quasi completo |
 | **`split_fm_sizematched` / `lnso10_sizematched`** | Non previsti | 🆕 su richiesta: separano quantità di dati e novità dello stimolo, valutati sugli stessi esempi del leave-clip-out |
 | Condizioni `tk0..2` su split FM | Non previste | 🆕 BA con clip condivise sulle clip tenute fuori, necessaria alla scomposizione (ricavata anche dalle predizioni salvate dei job vecchi) |
 | Correzione per permutazione del Δstim | Δcorr = Δraw − Δperm | 🔀 **Formula distorta.** Con label permutate le clip non viste scendono sotto il caso per costruzione (2/27 = 0.074). Adottata la correzione rispetto al caso: Δraw − (BA_viste^perm − 1/K); il valore originale resta riportato per trasparenza |
@@ -225,7 +225,7 @@ Anche per la valenza il vantaggio sopra il caso dipende dalle clip condivise.
 | 2 | ✅ Fatto (account 2, notebook B) | Solo passa-alto 4 Hz e solo passa-basso 30 Hz | CBraMod −38.0 e +1.0 | L'informazione di CBraMod è sotto 4 Hz, non EMG |
 | 3 | ✅ Fatto (account 2, notebook B) | Bordo frontale / temporale / 4 casuali | −1.0 / −1.5 / −0.1 | Nessun contributo oculare specifico |
 | 8 | ✅ Fatto (account 4, notebook B, 18 job): solo 0–4 Hz 0.576; passa-alto 1 Hz 0.259; clip nuove a 4–47 Hz 0.119 (n.s.) | CBraMod LoRA: leave-clip-out a 4–47 Hz (3 seed); solo 0–4 Hz, passa-alto 1 Hz e 2 Hz (3 seed) | Clip non viste senza contenuto lento; BA con solo 0–4 Hz; dove cade la soglia | Tolta l'impronta lenta della clip, emerge una generalizzazione? Quanto della BA sta in 0–4 Hz? |
-| 4 | Account 1, notebook D (330 job, circa 2 sessioni) | TSception, DE, DE+z-score su `lnso10`, `lnso10_lco`, `lnso10_sizematched` (+ permutati); EMG facoltativo | Effetto minimo rilevabile su 123 soggetti; clip non viste contro il caso; scomposizione | Gate di potenza; generalizzazione reale a stimoli nuovi (+1.8 su split FM, al limite) |
+| 4 | 🔀 Notebook D: 211/330 fatti (gate di potenza passato); restano permutati, CBraMod LCO (15, aggiunti), DE + z-score, EMG. 1 sessione | TSception, DE, DE+z-score su `lnso10`, `lnso10_lco`, `lnso10_sizematched` (+ permutati); EMG facoltativo | Effetto minimo rilevabile su 123 soggetti; clip non viste contro il caso; scomposizione | Gate di potenza; generalizzazione reale a stimoli nuovi (+1.8 su split FM, al limite) |
 | 6 | ✅ Fatto (account 3, notebook E, 33 job) | EEGNet originale, framework CBraMod, originale + EA | 0.257 / 0.222 / **0.455**; clip non viste al caso senza EA | Il divario con lo 0.409 viene da finestra e allineamento, non dalla ricetta CBraMod |
 | 9 | ✅ Fatto (notebook E, 15 job): solo 0–4 Hz 0.450 (= piena), 4–47 Hz 0.273; clip nuove a 4–47 Hz 0.136 (+2.5) | EEGNet originale + EA: passa-alto 4 Hz e solo 0–4 Hz (3 seed); leave-clip-out a 4–47 Hz (3 seed) | Il +19 delle finestre da 10 s viene dal contenuto lento? | Anche il miglior compatto usa la stessa impronta lenta di CBraMod? |
 | 7 | ✅ Fatto (account 3, notebook E, 57 job) | EEGNet originale + EA: leave-clip-out + 2 permutati, a parità di dati + 2 permutati, finestre da 4 s, 400 epoche. TSception originale (Ding 2022, 10 s) con e senza EA su split FM; con EA anche su leave-clip-out + 2 permutati | Clip non viste contro il caso; scomposizione; effetto della finestra | **Il miglior modello compatto (0.455) generalizza a stimoli nuovi?** H3 sul compatto |

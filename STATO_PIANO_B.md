@@ -254,6 +254,7 @@ soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binari
 | 15 | 24–25/11 | 3 / E (ripresa) | 57/57 | **EEGNet originale + EA su clip nuove: 0.115 (al caso)**, viste 0.513, memorizzazione 38.0. Finestre da 4 s 0.264: il salto viene dalla finestra. 400 epoche: nessun cambiamento. TSception originale: 0.214 con EA (= nostro), clip nuove **0.143 (+3.2, p 0.001)**. |
 | 16 | 25/11 | 2 / E (ripresa) | 15/15 | **EEGNet+EA con solo 0–4 Hz: 0.450 (= banda piena 0.455)**; con 4–47 Hz 0.273 (−18.3, come le finestre da 4 s). Leave-clip-out a 4–47 Hz: clip nuove **0.136 (+2.5 sul caso, p 0.007; +2.1 sulla banda piena, p 0.03)**. |
 | 17 | 25/11 | 4 / B (ripresa) | 18/18 | **CBraMod con solo 0–4 Hz: 0.576 (≥ banda piena 0.555, p 0.05)**. Passa-alto 1 Hz 0.259, 2 Hz 0.201, 4 Hz 0.177: **circa 3/4 della caduta sta sotto 1 Hz**. Leave-clip-out a 4–47 Hz: clip nuove 0.119 (+0.8, n.s.). |
+| 18 | 25–26/11 | 3 / D (ripresa) | 211/330 | **Gate di potenza passato**: effetto minimo rilevabile 1.5 punti su 123 soggetti. TSception sui 10 fold 0.259; **clip nuove 0.145 (+3.4 sul caso, p 1e-17)**. Scomposizione su 123 soggetti: dati +2.4, stimolo visto corretto −0.4 (IC95 −1.5/+0.7). CBraMod LoRA sui 10 fold 0.670; clip nuove (60 soggetti, 1 seed) 0.122. |
 
 **Risultati del notebook C (2026-11-24), 23 soggetti, caso 0.111:**
 - **Clip non viste (risultato centrale):**
@@ -321,6 +322,25 @@ soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binari
 - Soglia del passa-alto: 1 Hz 0.259 (−29.7), 2 Hz 0.201 (−35.6), 4 Hz 0.177 (−38.0). **Circa il 78% della caduta viene dalla banda 0.05–1 Hz** (i dati FACED processed partono da 0.05 Hz, con ICA oculare e riferimento medio).
 - Leave-clip-out a 4–47 Hz: viste 0.186, **non viste 0.119 (+0.8, n.s.)**. A differenza di EEGNet (0.136, +2.5), CBraMod senza contenuto lento non generalizza; la differenza tra i due (−1.6) però non è significativa (p 0.14).
 - **Lettura:** l'"impronta" della clip è un segnale molto lento (sotto 1 Hz) dentro la finestra da 10 s: derive, potenziali lenti, residui oculari sfuggiti all'ICA. Ordine di presentazione (verificato sul paper FACED): blocchi di 4 clip della stessa valenza, con l'ordine delle clip nei blocchi e dei 7 blocchi randomizzato tra i soggetti; 5 s di croce di fissazione prima di ogni clip, almeno 30 s di riposo dopo le valutazioni. Una deriva legata alla posizione nella sessione non può quindi identificare la stessa clip in soggetti diversi: il segnale lento che i modelli usano è **agganciato al contenuto della clip** (risposte lente evocate dal video, movimenti oculari residui). Decisione: non si approfondisce oltre.
+
+**Notebook D, 10 fold sui soggetti (sessione 18, 123 soggetti; 211 job su 330, nessun errore):**
+
+| Modello | 10 fold (`lnso10`) | Stessi soggetti di split FM (100–122) | split FM |
+|---|---|---|---|
+| Classe maggioritaria | 0.111 | — | 0.111 |
+| DE + asimmetrie | 0.208 | — | 0.185 |
+| DE + z-score per soggetto | 0.287 | — | 0.232 |
+| TSception + EA (3 seed) | 0.259 | 0.236 | 0.212 |
+| CBraMod LoRA (3 seed, prima sessione) | **0.670** | 0.576 | 0.557 |
+
+- **Gate di potenza passato:** deviazione standard delle differenze appaiate TSception − DE 0.059 → effetto minimo rilevabile **1.5 punti** (soglia 2). Nadeau–Bengio sui 10 fold: +5.1 punti, p 3e-5.
+- Con 111 soggetti di training invece di 80 tutti i modelli salgono (TSception +2.3, CBraMod +1.9 sugli stessi 23 soggetti di test). I fold con i soggetti 0–59 danno BA più alte di quelli con i soggetti 84–122 (CBraMod 0.69–0.82 contro 0.57–0.58): l'eterogeneità tra soggetti è grande.
+- Limite noto confermato innocuo: i fold 7–9 contengono i soggetti di validation di Optuna (080–099) ma hanno le BA più basse, quindi nessun ottimismo visibile.
+- **Clip nuove, TSception, 123 soggetti:** viste 0.281, **non viste 0.145 (+3.4 sul caso, IC95 +2.9/+4.0, p 1e-17, peggiorano 15% dei soggetti)**. La piccola generalizzazione a stimoli nuovi vista su split FM (+1.8, al limite) è reale.
+- **Scomposizione a parità di dati, TSception, 123 soggetti:** BA_full 0.259, BA_size 0.235, BA_unseen 0.145, BA_size permutato 0.205. Quantità di dati +2.4 (p 2e-8); stimolo visto +9.0; **corretto per permutazione −0.4 (IC95 −1.5/+0.7, p 0.60)**. Con piena potenza il vantaggio delle clip viste, a parità di dati, è tutto memorizzazione (H3 per TSception: zero con intervallo stretto).
+- **CBraMod LoRA sulle clip nuove (60 soggetti, 15 fold su 30, 1 seed, dalla prima sessione con codice vecchio):** viste 0.757, non viste 0.122 (+1.1, p 0.04 unilaterale). Sugli stessi 60 soggetti TSception fa meglio sulle clip nuove (+2.8, p 7e-5). Aggiunti alla coda D i 15 fold mancanti, per avere CBraMod su tutti i 123 soggetti.
+- BN-α (TSception): +2.8 sui 10 fold, +0.9 sulle clip nuove. DE + z-score contro DE: +7.9.
+- Restano in coda D (circa 1 sessione): permutati del leave-clip-out di TSception (30), CBraMod sul leave-clip-out (15), DE + z-score su leave-clip-out e parità di dati (58), EMG facoltativo (30).
 
 - Correzione al riepilogo: il JSON compatto poteva riportare i test di permutazione dei job invalidati (i record per job non avevano l'orario). Ora ogni record ha l'orario e i vecchi lo prendono dal file `done`; le tabelle per soggetto erano già corrette.
 
@@ -419,7 +439,7 @@ Limite noto: gli iperparametri vengono da Optuna su split FM, che usa i soggetti
 |---|---|---|
 | Gate 1, riproduzione | `cbramod_ft_official` su `split_fm`, 3 seed, BA pooled a livello di finestra entro circa 2 punti da 0.5509 | **PASSATO (2026-11-23)**: BA pooled 0.5579 (seed 0.5613 / 0.5546 / 0.5578), κ 0.500, F1w 0.563 (paper 0.5509 / 0.5041 / 0.5618) |
 | Gate 2, pipeline | tutte le config (tranne REVE) su `split_fm` e `split_fm_lco`, con tabelle e indici | da eseguire |
-| Gate di potenza | dopo `lnso10` per 2 config: effetto minimo rilevabile ≤ 2 punti? | da eseguire |
+| Gate di potenza | dopo `lnso10` per 2 config: effetto minimo rilevabile ≤ 2 punti? | **PASSATO (2026-11-26)**: 1.5 punti (TSception contro DE, 123 soggetti) |
 
 Se il Gate 1 fallisce, controllare in quest'ordine:
 - scala /100;
