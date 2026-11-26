@@ -255,6 +255,7 @@ soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binari
 | 16 | 25/11 | 2 / E (ripresa) | 15/15 | **EEGNet+EA con solo 0–4 Hz: 0.450 (= banda piena 0.455)**; con 4–47 Hz 0.273 (−18.3, come le finestre da 4 s). Leave-clip-out a 4–47 Hz: clip nuove **0.136 (+2.5 sul caso, p 0.007; +2.1 sulla banda piena, p 0.03)**. |
 | 17 | 25/11 | 4 / B (ripresa) | 18/18 | **CBraMod con solo 0–4 Hz: 0.576 (≥ banda piena 0.555, p 0.05)**. Passa-alto 1 Hz 0.259, 2 Hz 0.201, 4 Hz 0.177: **circa 3/4 della caduta sta sotto 1 Hz**. Leave-clip-out a 4–47 Hz: clip nuove 0.119 (+0.8, n.s.). |
 | 18 | 25–26/11 | 3 / D (ripresa) | 211/330 | **Gate di potenza passato**: effetto minimo rilevabile 1.5 punti su 123 soggetti. TSception sui 10 fold 0.259; **clip nuove 0.145 (+3.4 sul caso, p 1e-17)**. Scomposizione su 123 soggetti: dati +2.4, stimolo visto corretto −0.4 (IC95 −1.5/+0.7). CBraMod LoRA sui 10 fold 0.670; clip nuove (60 soggetti, 1 seed) 0.122. |
+| 19 | 26/11 | 4 / E (ripresa) | 6/6 | Permutati di EEGNet + EA a 4–47 Hz: memorizzazione 22.3 (contro 38.0 a banda piena); divario viste/non viste interamente memorizzazione (corretto −3.7); le clip nuove a 0.136 (+2.5) restano una generalizzazione reale. |
 
 **Risultati del notebook C (2026-11-24), 23 soggetti, caso 0.111:**
 - **Clip non viste (risultato centrale):**
@@ -315,7 +316,8 @@ soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binari
 - Solo 0–4 Hz: 0.450 contro 0.455 a banda piena (n.s.). Tutta l'accuratezza sulle clip condivise sta sotto 4 Hz, come per CBraMod.
 - Solo 4–47 Hz: 0.273 (−18.3, peggiorano 22 soggetti su 23), uguale alle finestre da 4 s (0.264, differenza n.s.). **Il vantaggio delle finestre lunghe è proprio il contenuto lento.**
 - Leave-clip-out a 4–47 Hz: viste 0.322, **non viste 0.136 (+2.5 sul caso, p 0.007)**, contro 0.115 a banda piena (+2.1, p 0.03). Tolta l'impronta lenta della clip, la generalizzazione a clip nuove compare, piccola, al livello dei modelli compatti (TSception 0.130, differenza n.s.).
-- Resta un divario viste/non viste di 18.6 punti: in coda 2 modelli permutati per fold a 4–47 Hz per dire quanto è ancora memorizzazione.
+- Resta un divario viste/non viste di 18.6 punti. **Permutati a 4–47 Hz (sessione 19, 2 per fold):** con le label permutate le clip viste arrivano a 0.334 (più delle label vere, 0.322) e le nuove a 0.094. Memorizzazione **22.3 punti** sopra il caso (contro 38.0 a banda piena: togliere il segnale lento ne elimina circa il 40%); corretto rispetto al caso **−3.7 (p 6e-4)**: il divario viste/non viste è tutto memorizzazione. Il +2.5 sulle clip nuove non è toccato da questa correzione (le clip nuove non si possono memorizzare) ed è la sola parte che generalizza.
+- Corretto un errore nell'indice: con una variante di banda, `delta_stim` prendeva i modelli permutati a banda piena invece di quelli della stessa banda. Ora prende i permutati della stessa variante; l'aggregatore li riporta per ogni variante che li ha.
 
 **Notebook B, bande (sessione 17, CBraMod LoRA, 3 seed):**
 - Solo 0–4 Hz: **0.576**, anzi leggermente sopra la banda piena (+1.9, p 0.05). Tutto quello che CBraMod usa sta sotto 4 Hz.

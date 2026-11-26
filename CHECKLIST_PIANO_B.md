@@ -119,7 +119,7 @@ Atteso, da Xu & Plataniotis (encoder contrastivi): calo da 2.2 a 44.4 punti, cor
 | 🆕 EEGNet, framework CBraMod | 0.219 | 0.119 | 10.0 | +0.8 (n.s.) | — | — |
 | 🆕 **EEGNet originale + EA** | 0.513 | **0.115** | 39.8 | +0.4 (p 0.32) | **38.0** | +1.8 (p 0.04) |
 | 🆕 TSception originale + EA | 0.234 | **0.143** | 9.1 | **+3.2 (p 0.001)** | 12.0 | −2.9 |
-| 🆕 EEGNet originale + EA, 4–47 Hz | 0.322 | **0.136** | 18.6 | **+2.5 (p 0.007)** | ⏳ | ⏳ |
+| 🆕 EEGNet originale + EA, 4–47 Hz | 0.322 | **0.136** | 18.6 | **+2.5 (p 0.007)** | 22.3 | −3.7 (p 6e-4) |
 | 🆕 CBraMod LoRA, 4–47 Hz | 0.186 | 0.119 | 6.7 | +0.8 (n.s.) | — | — |
 | TSception + EA | 0.247 | 0.130 | 11.7 | +1.8 (p 0.01) | 14.2 | −2.5 |
 | **CBraMod, ricetta ufficiale** | 0.588 | **0.111** | **47.8** | −0.05 (p 0.94) | — | — |

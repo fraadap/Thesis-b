@@ -2,6 +2,8 @@
 appaiato, sonda dell'identità della clip, permutazione delle label di test a livello di clip."""
 from __future__ import annotations
 
+import re
+
 import numpy as np
 import pandas as pd
 
@@ -44,7 +46,8 @@ def delta_stim(df: pd.DataFrame, config: str, protocol: str, metric: str = "ba_w
     if tv is None:
         return {}
     raw = tv["seen"] - tv["unseen"]
-    pv = d[d.variant.str.fullmatch(r"perm\d+")]
+    # modelli permutati con la stessa variante (es. "bp4-47_perm0" per base_variant "bp4-47")
+    pv = d[d.variant.str.fullmatch(r"perm\d+" if base_variant == "base" else re.escape(base_variant) + r"_perm\d+")]
     out = {"subjects": raw.index.tolist(), "raw": raw.values.tolist(), "raw_mean": float(raw.mean()),
            "seen_mean": float(tv["seen"].mean()), "unseen_mean": float(tv["unseen"].mean()), "chance": 1 / K,
            "n_perm_runs": int(pv[["variant", "seed"]].drop_duplicates().shape[0])}

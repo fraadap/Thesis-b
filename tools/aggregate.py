@@ -269,6 +269,16 @@ def main():
                       (f"; permutate viste {d['seen_perm_mean']:.3f} / non viste {d['unseen_perm_mean']:.3f}; "
                        f"memorizzazione {d['memorization_mean']:.4f}; corretto (vs caso) {d['corr_chance_mean']:.4f}; "
                        f"corretto (prompt) {d['corr_mean']:.4f}" if "corr_mean" in d else ""))
+    # varianti (es. bande) che hanno anche modelli permutati sul leave-clip-out
+    lco = df[df.protocol == "split_fm_lco"]
+    for c in sorted(lco.config.unique()):
+        vs = set(lco[lco.config == c].variant)
+        for v in sorted(x for x in vs if x != "base" and "perm" not in x and any(y.startswith(x + "_perm") for y in vs)):
+            d = delta_stim(df, c, "split_fm_lco", base_variant=v)
+            if d and "corr_mean" in d:
+                md.append(f"- Δstim {c} [split_fm_lco, {v}]: viste {d['seen_mean']:.3f}, non viste {d['unseen_mean']:.3f}; "
+                          f"permutate viste {d['seen_perm_mean']:.3f} / non viste {d['unseen_perm_mean']:.3f}; "
+                          f"memorizzazione {d['memorization_mean']:.4f}; corretto (vs caso) {d['corr_chance_mean']:.4f}")
     for c in sorted(df.config.unique()):
         e = delta_emg(df, c)
         if e and len(e) > 2:
