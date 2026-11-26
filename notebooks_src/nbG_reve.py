@@ -19,9 +19,18 @@ from pianob.models.reve import weights as reve_weights
 if SYNTHETIC:
     print("sintetico: niente download, pesi casuali")
 else:
-    from kaggle_secrets import UserSecretsClient
-    HF_TOKEN = UserSecretsClient().get_secret("HF_TOKEN")
-    REVE_INFO = reve_weights.download(HF_TOKEN)
+    HF_TOKEN = None                       # il token serve solo se il repo dei pesi è ad accesso controllato
+    try:
+        from kaggle_secrets import UserSecretsClient
+        HF_TOKEN = UserSecretsClient().get_secret("HF_TOKEN")
+    except Exception as e:
+        print(f"Secret HF_TOKEN non disponibile ({e!r}): provo il download senza token")
+    try:
+        REVE_INFO = reve_weights.download(HF_TOKEN)
+    except Exception as e:
+        raise RuntimeError("Download dei pesi REVE fallito. Se l'errore è 401/403 il repo richiede di accettare "
+                           "le condizioni d'uso su huggingface.co e il Secret HF_TOKEN (README_KAGGLE.md, C2); "
+                           "controlla anche che Internet sia attivo.") from e
     print({k: v for k, v in REVE_INFO.items() if k != "config"})
 
 # %%

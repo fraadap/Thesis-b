@@ -136,6 +136,9 @@ Non usare *Run All* in modalità interattiva: la sessione si interrompe se chiud
 
 I pesi di `brain-bzh/reve-base` sono pubblicati con condizioni d'uso (niente redistribuzione, niente
 re-identificazione). Per questo non stanno nello zip dei dati: il notebook G li scarica a ogni sessione.
+Se il repo è ad accesso controllato (bisogna accettare le condizioni sulla pagina del modello), il download
+richiede un token, con il nostro codice come con `AutoModel.from_pretrained`. Senza Secret il notebook prova
+comunque il download anonimo e, se Hugging Face risponde 401/403, si ferma con un messaggio chiaro.
 
 1. Su huggingface.co, con il tuo account, apri `brain-bzh/reve-base` e accetta le condizioni d'uso.
 2. *Settings* → *Access Tokens* → crea un token di tipo **Read**.
