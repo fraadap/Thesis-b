@@ -93,6 +93,10 @@ def worker_loop(queue_path: str, worker: str, synthetic: bool, device: str) -> N
                 skipped_time.add(j.job_id)
                 log(f"salto {j.job_id}: stima {est:.0f} min > tempo residuo {guard.remaining_min():.0f} min")
                 continue
+            disk = kaggle_env.disk_status()
+            if not disk["ok"]:
+                log(f"spazio su disco insufficiente ({disk}): mi fermo per salvare l'output della sessione")
+                return
             if not try_claim(j, worker):
                 continue
             started = True
@@ -104,6 +108,8 @@ def worker_loop(queue_path: str, worker: str, synthetic: bool, device: str) -> N
                 status = "failed"
                 failed.add(j.job_id)
                 log(f"ERRORE {j.job_id}: {e!r}\n{traceback.format_exc()}")
+                for tmp in (kaggle_env.state_dir() / "ckpt").glob(f"{j.job_id}*.tmp"):
+                    tmp.unlink(missing_ok=True)              # checkpoint parziale (es. disco pieno)
                 mark(j, "failed", worker, (time.time() - t0) / 60, {"error": repr(e)[:500]})
             else:
                 mark(j, status, worker, (time.time() - t0) / 60)

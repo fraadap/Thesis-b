@@ -99,3 +99,24 @@ def test_invalidated_jobs_rerun_and_rows_dropped(tmp_path, monkeypatch):
                        {**base, "config": "tsception_ea", "variant": "bp4-30_noedge"},
                        {**base, "config": "tsception_ea", "variant": "base"}])
     assert Q.invalid_row_mask(df).tolist() == [True, True, False, False, False]
+
+
+def test_restore_skips_partial_and_large_models(tmp_path, monkeypatch):
+    """Notebook G (disco pieno): la ripresa non copia checkpoint parziali né i modelli grandi."""
+    from pianob import kaggle_env as K
+    src = tmp_path / "inp" / "out" / K.STATE_DIRNAME
+    (src / "ckpt").mkdir(parents=True)
+    (src / "models").mkdir()
+    (src / "ckpt" / "a.pt.tmp").write_bytes(b"x")
+    (src / "ckpt" / "b.pt").write_bytes(b"x")
+    (src / "models" / "small.pt").write_bytes(b"x")
+    big = src / "models" / "big.pt"
+    with open(big, "wb") as fh:
+        fh.truncate(K.RESTORE_MODEL_MAX_BYTES + 1)
+    monkeypatch.setenv("PIANOB_WORKING", str(tmp_path / "work"))
+    monkeypatch.setenv("PIANOB_INPUT", str(tmp_path / "inp"))
+    K.restore_state_from_inputs(verbose=False)
+    dst = K.state_dir()
+    assert (dst / "ckpt" / "b.pt").exists() and not (dst / "ckpt" / "a.pt.tmp").exists()
+    assert (dst / "models" / "small.pt").exists() and not (dst / "models" / "big.pt").exists()
+    assert K.disk_status()["used_gb"] < 1

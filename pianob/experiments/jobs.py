@@ -182,6 +182,9 @@ def run_job(job: Job, ctx: Context) -> str:
     return run_neural(job, ctx, cfg, hp_source)
 
 
+SAVE_MODEL_MAX_PARAMS = 10_000_000
+
+
 def run_select(job: Job, ctx: Context) -> str:
     """Riselezione su più seed (Sessione 02, dopo i collassi del notebook F): per ogni candidato (tag -> trial)
     media della BA di VALIDATION sui seed; vince la media più alta (un collasso conta come 1/K). Scrive il
@@ -578,7 +581,9 @@ def run_neural(job: Job, ctx: Context, cfg: ExpConfig, hp_source: str) -> str:
         bdir = st / "artifacts" / "bnstats"
         bdir.mkdir(parents=True, exist_ok=True)
         torch.save(collect_subject_bn_stats(model, banks["train"], ctx.device), bdir / f"{job.job_id}.pt")
-    if cfg.model != "cbramod" or job.overrides.get("save_model"):
+    # modello finale salvato solo per i modelli piccoli (hook delle Proposte): REVE (284 MB a job) e CBraMod
+    # riempivano i 20 GB di /kaggle/working (notebook G, 2026-11-27: disco pieno dopo ~40 job)
+    if params["total"] < SAVE_MODEL_MAX_PARAMS or job.overrides.get("save_model"):
         (st / "models").mkdir(exist_ok=True)
         torch.save(res["best_state"], st / "models" / f"{job.job_id}.pt")
     rec["minutes"] = (time.time() - t0) / 60

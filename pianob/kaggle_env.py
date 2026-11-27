@@ -95,6 +95,21 @@ def find_dir(name: str, roots: list[Path] | None = None, max_depth: int = 7) -> 
     return out
 
 
+RESTORE_MODEL_MAX_BYTES = 50 * 2**20
+# /kaggle/working ha 20 GB: sotto questa soglia di spazio libero il worker si ferma (output della sessione salvo)
+MIN_FREE_GB = 4.0
+WORKING_QUOTA_GB = 19.5
+
+
+def disk_status() -> dict:
+    """Spazio libero del disco di lavoro e occupazione della cartella di lavoro (in GB)."""
+    w = working_dir()
+    free = shutil.disk_usage(w).free / 2**30
+    used = sum(f.stat().st_size for f in w.rglob("*") if f.is_file()) / 2**30
+    return {"free_gb": round(free, 2), "used_gb": round(used, 2),
+            "ok": free >= MIN_FREE_GB and used <= WORKING_QUOTA_GB - MIN_FREE_GB}
+
+
 def restore_state_from_inputs(verbose: bool = True) -> dict:
     """Copia nello stato corrente risultati, done, checkpoint, .db Optuna ecc. trovati negli
     output di sessioni precedenti collegati come input. Non sovrascrive file più recenti."""
@@ -108,8 +123,10 @@ def restore_state_from_inputs(verbose: bool = True) -> dict:
             if not s.exists():
                 continue
             for f in s.rglob("*"):
-                if not f.is_file():
+                if not f.is_file() or ".tmp" in f.name:      # file parziali di un salvataggio interrotto
                     continue
+                if sub == "models" and f.stat().st_size > RESTORE_MODEL_MAX_BYTES:
+                    continue                                 # modelli grandi delle sessioni vecchie: non servono
                 rel = f.relative_to(src_state)
                 t = dst / rel
                 if t.exists() and t.stat().st_size >= f.stat().st_size and sub not in ("results", "done"):
