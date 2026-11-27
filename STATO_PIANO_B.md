@@ -61,6 +61,12 @@ fissato a priori DE + z-score su `lnso10_lco`:
   `nbI_selfreport_cbramod`. Worker solo-CPU per le baseline su feature (`--cpu-workers`). Aggregatore: sezione
   "Sessione 03".
 
+**Verificato su `DataStructureOfBehaviouralData.xlsx` (2026-11-27):** campi `score` (voti 0-7 dei 12 item per le 28
+clip), `trial` (ordine di presentazione), `vid` (indice della clip 1-28), `Accuracy` e `ResponseTime` (compito
+aritmetico tra i blocchi); ordine degli item `joy, tenderness, inspiration, amusement, anger, disgust, fear, sadness,
+arousal, valence, familiarity, liking`, identico a quello del codice; valence 0 = molto negativo, 7 = molto positivo.
+Il file non dice se le righe di `score` seguono `trial` o `vid`: l'allineamento resta deciso dai dati.
+
 **Scelte registrate [DA VERIFICARE sui file veri]:**
 - struttura di After_remarks: accettati dict con `score` 28 x 12 (o 12 x 28) e array di struct 1 x 28; allineamento
   scelto se la concordanza differisce di almeno 0.2, altrimenti stop; concordanza media < 0.2 = stop; ordine delle

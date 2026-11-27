@@ -5,8 +5,13 @@ Dataset Kaggle dei dati FACED. Struttura attesa (da una guida di terze parti, qu
 `score` 28 x 12 (voti 0-7), `trial` (ordine di presentazione), `vid` (indice canonico della clip, 1-28),
 `Accuracy` / `ResponseTime` (compito aritmetico: salvati a parte, non usati).
 
-Ordine atteso delle 12 colonne di `score`:
+Ordine delle 12 colonne di `score` (confermato da DataStructureOfBehaviouralData.xlsx, 2026-11-27):
   joy, tenderness, inspiration, amusement, anger, disgust, fear, sadness, arousal, valence, familiarity, liking
+Scala 0-7: valence 0 = molto negativo, 7 = molto positivo; gli altri item 0 = per niente, 7 = moltissimo.
+`trial` = ordine di presentazione delle 28 clip, `vid` = indice della clip (1-28): il file non dice se le righe di
+`score` seguono l'uno o l'altro, quindi l'allineamento resta deciso dai dati (concordanza).
+`Accuracy` = accuratezza media del compito aritmetico in ogni intervallo tra i blocchi; `ResponseTime` = tempi dei
+20 problemi per intervallo (oltre 4 s = risposta mancata).
 
 Scelte (tutte registrate in `meta_selfreport.json`):
 - l'allineamento delle righe di `score` alle clip (ordine di presentazione oppure canonico) si decide dai dati,
@@ -126,8 +131,14 @@ def parse_after_remarks(raw: dict) -> dict:
     vid = np.ravel(np.asarray(vid, dtype=float))
     if trial.shape != (28,) or vid.shape != (28,):
         raise SelfReportError(f"trial {trial.shape} / vid {vid.shape}: attesi 28 valori")
-    extra = {k: np.ravel(np.asarray(v, dtype=float)) for k, v in rem.items()
-             if str(k).lower() in ("accuracy", "responsetime")}
+    extra = {}
+    for k, v in rem.items():         # compito aritmetico tra i blocchi: per blocco (e 20 problemi per blocco)
+        if str(k).lower() in ("accuracy", "responsetime"):
+            try:
+                extra[k] = np.ravel(np.asarray(v, dtype=float))
+            except (TypeError, ValueError):          # struttura annidata irregolare: appiattita a mano
+                extra[k] = np.asarray([float(x) for x in np.ravel(np.asarray(v, dtype=object))
+                                       for x in np.ravel(np.asarray(x, dtype=float))])
     return {"score": score, "trial": trial.astype(int), "vid": vid.astype(int), "extra": extra,
             "fields": {str(k): str(np.shape(v)) + " " + type(v).__name__ for k, v in rem.items()}}
 
