@@ -38,6 +38,23 @@ def _needs_gpu(job) -> bool:
     return get_config(job.config).family == "neural"
 
 
+def _gate_r_passed() -> bool:
+    """Sessione 03, blocco REVE del notebook I: solo se il Gate R della Sessione 02 risulta passato nei record
+    disponibili (stato corrente più output del notebook G collegati come input)."""
+    from .report import gate_r, load_jobs
+    try:
+        return gate_r(load_jobs()).get("status") == "PASSATO"
+    except Exception:
+        return False
+
+
+def _job_kind(job) -> str:
+    if job.kind != "train":
+        return "neural"
+    from .experiments.registry import get_config
+    return "cpu" if get_config(job.config).family in ("features", "const") else "neural"
+
+
 def worker_loop(queue_path: str, worker: str, synthetic: bool, device: str) -> None:
     from .bench import empirical_minutes, estimate_job
     from .data.adapters import FacedAdapter
@@ -45,6 +62,10 @@ def worker_loop(queue_path: str, worker: str, synthetic: bool, device: str) -> N
     from .experiments.queue import DONE_STATUSES, done_status, is_locked, load_queue, mark, release, try_claim
 
     jobs = load_queue(queue_path)
+    # Sessione 03: con worker solo-CPU, quelli su GPU lasciano loro le baseline su feature e viceversa
+    only = os.environ.get("PIANOB_WORKER_ONLY")
+    if only:
+        jobs = [j for j in jobs if _job_kind(j) == only]
     guard = kaggle_env.TimeGuard()
     adapter = FacedAdapter(synthetic=synthetic, synth_subjects=123).load()
     wp = None
@@ -87,6 +108,10 @@ def worker_loop(queue_path: str, worker: str, synthetic: bool, device: str) -> N
                 continue
             if is_locked(j):
                 waiting = True
+                continue
+            if j.overrides.get("needs_gate_r") and not _gate_r_passed():
+                skipped_time.add(j.job_id)
+                log(f"salto {j.job_id}: Gate R di REVE non passato (o non disponibile negli input)")
                 continue
             est = estimate_job(j, bench, emp)
             if not guard.can_start(est):
@@ -138,6 +163,8 @@ def main(argv=None):
     ap.add_argument("--synthetic", action="store_true")
     ap.add_argument("--worker", default=None, help="(interno) id del worker")
     ap.add_argument("--skip-bench", action="store_true")
+    ap.add_argument("--cpu-workers", type=int, default=0,
+                    help="worker aggiuntivi solo per le baseline su feature (i worker GPU fanno solo i neurali)")
     a = ap.parse_args(argv)
     os.environ.setdefault("PIANOB_T0", str(time.time()))
     if a.synthetic:
@@ -170,17 +197,22 @@ def main(argv=None):
         jobs = load_queue(a.queue)
         bench = run_bench(jobs, "cuda" if gpus else "cpu")
         print_estimates(jobs, bench, max(1, len(gpus)))
-    if len(gpus) <= 1:
+    if len(gpus) <= 1 and not a.cpu_workers:
         if gpus:
             os.environ["CUDA_VISIBLE_DEVICES"] = str(gpus[0])
             os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
         worker_loop(a.queue, "w0", synthetic, "cuda" if gpus else "cpu")
         return
     procs = []
-    for g in gpus:
-        env = dict(os.environ, CUDA_VISIBLE_DEVICES=str(g))
+    slots = [(f"w{g}", {"CUDA_VISIBLE_DEVICES": str(g)}) for g in gpus]
+    if a.cpu_workers:
+        slots = [(w, {**e, "PIANOB_WORKER_ONLY": "neural"}) for w, e in slots]
+        slots += [(f"c{k}", {"CUDA_VISIBLE_DEVICES": "", "PIANOB_WORKER_ONLY": "cpu", "OMP_NUM_THREADS": "1",
+                             "OPENBLAS_NUM_THREADS": "1", "MKL_NUM_THREADS": "1"}) for k in range(a.cpu_workers)]
+    for wname, extra in slots:
+        env = dict(os.environ, **extra)
         env.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
-        cmd = [sys.executable, "-u", "-m", "pianob.run", "--queue", a.queue, "--worker", f"w{g}"]
+        cmd = [sys.executable, "-u", "-m", "pianob.run", "--queue", a.queue, "--worker", wname]
         if synthetic:
             cmd.append("--synthetic")
         p = subprocess.Popen(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,

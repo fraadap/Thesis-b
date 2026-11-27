@@ -114,6 +114,8 @@ Pagina del Dataset `pianob-code` → *New Version* → carica il nuovo `pianob_c
 | `nbE_eegnet.ipynb` | a rotazione | EEGNet e TSception con la metodologia originale, bande |
 | `nbF_ricetta_pretraining.ipynb` | Sessione 02 | Optuna della ricetta a due fasi di CBraMod, controllo di sanità, CBraMod a due fasi (pre-addestrato e da zero), pretraining sulle clip non viste. Coda `F` (circa 1-2 sessioni) |
 | `nbG_reve.ipynb` | Sessione 02, account dedicato | REVE-Base: Gate R poi tutti i protocolli di CBraMod. Coda `G` (2-3 sessioni). **Internet ON** e Secret `HF_TOKEN` (sezione C2) |
+| `nbH_selfreport_feature.ipynb` | Sessione 03 | Label da self-report: tabella dei voti, descrittive (`report_selfreport_stage1.md`), rianalisi delle predizioni salvate, DE + z-score (worker solo-CPU) e TSception. Coda `H` (2-3 sessioni). Input: anche **gli output di tutte le sessioni precedenti** (sezione C3) |
+| `nbI_selfreport_cbramod.ipynb` | Sessione 03, in parallelo a H | Label da self-report con CBraMod (ricetta ufficiale); REVE solo se il Gate R è passato (output del notebook G in input, Internet ON e `HF_TOKEN`). Coda `I` (2+ sessioni) |
 
 La coda `F_bis` (ablazione della testa) è solo preparata: non c'è un notebook. Si lancia solo se l'aggregatore
 scrive "LANCIARE la coda F_bis" (regola A.4); in quel caso basta cambiare `"F"` in `"F_bis"` nel notebook F.
@@ -131,6 +133,21 @@ Per ogni account:
 4. Per l'esecuzione in background: in alto a destra **Save Version** → *Save & Run All (Commit)* → *Save*. La run continua anche a browser chiuso. La trovi in *View Active Events* o nella pagina del notebook, alla voce *Versions*.
 
 Non usare *Run All* in modalità interattiva: la sessione si interrompe se chiudi il browser.
+
+### C3. Sessione 03: file comportamentali e input dei notebook H e I
+
+1. Aggiungi al Dataset `pianob-faced-data` (*New Version*) i **file comportamentali** di FACED: le cartelle
+   `sub000` … `sub122` con `After_remarks.mat` (oppure `.pkl`), più `Stimuli_info.xlsx` e, se c'è,
+   `DataStructureOfBehaviouralData.xlsx`. La posizione nel Dataset è libera: il codice li cerca per nome.
+2. Il passo 0 (in entrambi i notebook) costruisce la tabella dei voti, sceglie dai dati l'allineamento delle
+   righe e si **ferma con un messaggio esplicito** se un controllo bloccante fallisce: in quel caso copiami il messaggio.
+3. Notebook H: in *Input* aggiungi anche gli **output di tutte le sessioni precedenti** (notebook A–G). Servono
+   alla rianalisi delle predizioni già salvate e restano in sola lettura: alla ripresa il notebook copia nello
+   stato solo gli output di sé stesso.
+4. Notebook I: per includere REVE aggiungi l'output del notebook G (serve il Gate R passato), Internet ON e il
+   Secret `HF_TOKEN` (sezione C2). Senza, i job REVE si saltano e il resto prosegue.
+5. Dopo la prima esecuzione riportami l'hash `sha256` della tabella dei voti (nel log del passo 0): lo registro nel
+   codice (`EXPECTED_SELFREPORT_SHA`), così i due notebook verificano di usare gli stessi voti.
 
 ### C2. REVE: token Hugging Face e Internet (solo notebook G)
 

@@ -19,6 +19,7 @@ class ExpConfig:
     align_rescale: bool = False     # dopo EA/z-score riporta l'RMS a quello dei dati grezzi (per i FM)
     features: str = ""              # logpower5 | de_asym
     feature_zsub: bool = False      # z-score delle feature per soggetto
+    feature_clipres: bool = False   # Sessione 03 (§5): feature meno la media della loro clip, entro ogni insieme
     channel_layout: str = "all"     # all | hemispheric (TSception)
     pretrained: bool = False
     recipe: str = "default"         # default | cbramod_official

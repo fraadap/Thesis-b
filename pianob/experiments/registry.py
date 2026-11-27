@@ -57,6 +57,11 @@ def _all() -> dict[str, ExpConfig]:
           hparams={"clf": ["lr", "svm"]}, notes="DE + DASM + RASM, LR o SVM lineare scelto in validation"),
         C("de_asym_lr_zsub", "features", "lr", window_s=10, features="de_asym", feature_zsub=True,
           hparams={"clf": ["lr", "svm"]}, notes="z-score delle feature per soggetto (trasduttivo)"),
+        # Sessione 03, §5: feature residualizzate sulla clip (media della clip tolta entro training, val e test,
+        # ciascuno dai propri soggetti, senza etichette; trasduttivo sul test): il modello non riapprende mu
+        C("de_asym_lr_zsub_clipres", "features", "lr", window_s=10, features="de_asym", feature_zsub=True,
+          feature_clipres=True, hparams={"clf": ["lr", "svm"]},
+          notes="DE + z-score per soggetto, feature meno la media della clip (Sessione 03)"),
         C("eegnet_ea", "neural", "eegnet", window_s=4, overlap_train=0.5, align="ea", hparams=dict(_EEGNET),
           hpo_study="eegnet_ea", tta_bnalpha=True),
         C("eegnet_noalign", "neural", "eegnet", window_s=4, overlap_train=0.5, align="none",

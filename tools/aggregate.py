@@ -274,6 +274,9 @@ def main():
     ap.add_argument("--out", default="analysis")
     ap.add_argument("--best", default="auto", help="modello per H3/H4; 'auto' = BA più alta su split_fm tra i "
                                                     "modelli neurali con scomposizione e ablazione EMG")
+    ap.add_argument("--sr-boot", type=int, default=2000, help="Sessione 03: ricampionamenti bootstrap (0 = niente IC)")
+    ap.add_argument("--sr-perm", type=int, default=5000, help="Sessione 03: permutazioni dei residui entro clip")
+    ap.add_argument("--no-h2", action="store_true", help="Sessione 03: salta la rianalisi delle predizioni a 9 classi")
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -352,6 +355,12 @@ def main():
     gr = gate_r(jobs) if jobs else next((c.get("gate_r") for c in compact if c.get("gate_r")), None)
     tmg = timing(jobs) if jobs else next((c.get("timing") for c in compact if c.get("timing")), None)
     md += session02.markdown(df, jobs, gr, tmg)
+    # Sessione 03: label da self-report (servono la tabella dei voti e le predizioni negli input)
+    from pianob.selfreport import analysis as SA
+    sr = SA.run_all([p for p in a.inputs if Path(p).suffix == ".zip" or Path(p).is_dir()], out / "selfreport",
+                    rows=df, n_boot=a.sr_boot, n_perm=a.sr_perm, h2=not a.no_h2, log=lambda *x: None)
+    if sr:
+        md += sr["markdown"]
     second = session02.second_family(df, jobs)
     (out / "risultati.md").write_text("\n".join(md) + "\n")
     json.dump({"primary": prim, "second_family": second}, open(out / "ipotesi_primarie.json", "w"), indent=1, default=str)

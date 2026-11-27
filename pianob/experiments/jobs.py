@@ -18,6 +18,7 @@ from ..prep.alignment import align_subject
 from ..prep.filters import kept_channels
 from .queue import Job
 from .registry import resolve_config
+from ..selfreport.targets import SR_TASKS, is_sr
 
 
 @dataclass
@@ -36,7 +37,8 @@ class Context:
 class JobData:
     cfg: ExpConfig
     split: Split
-    clip_labels: np.ndarray        # label per clip (eventualmente permutate), -1 = esclusa
+    clip_labels: np.ndarray        # label per clip (eventualmente permutate), -1 = esclusa; per i task da
+                                   # self-report (Sessione 03) matrice (soggetti x clip)
     n_classes: int
     channels: list[int]
     channel_names: list[str]
@@ -48,15 +50,27 @@ def prepare(job: Job, ctx: Context, cfg: ExpConfig) -> JobData:
     task_clips = ad.task_clips(job.task)
     split = make_split(job.protocol, job.fold, task_clips, ad.subjects(), clip_labels=ad.meta["clip_labels"],
                        draw=job.draw or 0, max_subjects=job.overrides.get("max_subjects"))
-    if job.perm is not None:
+    if is_sr(job.task):
+        from ..selfreport.table import load_votes
+        from ..selfreport.targets import label_matrix
+        # perm = permutazione dei residui del voto entro clip tra i soggetti di training (non della mappa clip)
+        lab = label_matrix(job.task, load_votes(synthetic=ad.synthetic), int(ad.meta["n_subjects_slots"]), split,
+                           perm=job.perm)
+    elif job.perm is not None:
         lab = permute_clip_labels(lab, job.perm, task_clips)
     kept = kept_channels(ad.channel_names(), job.drop)
     if cfg.channel_layout == "hemispheric":
         from ..models.tsception import hemispheric_order
         kept = [kept[i] for i in hemispheric_order(kept)]
     idx = ad.channel_indices(kept)
-    n_classes = int(ad.labels(job.task).max() + 1)
+    n_classes = SR_TASKS[job.task]["n_classes"] if is_sr(job.task) else int(ad.labels(job.task).max() + 1)
     return JobData(cfg, split, np.asarray(lab), n_classes, idx, kept)
+
+
+def _lab_at(lab, s, c):
+    """Label dei trial: per clip (vettore) oppure per (soggetto, clip) (matrice, task da self-report)."""
+    lab = np.asarray(lab)
+    return lab[np.asarray(s), np.asarray(c)] if lab.ndim == 2 else lab[np.asarray(c)]
 
 
 def load_aligned(ctx: Context, jd: JobData, subjects, clips, fit_clips, band, win_len: int,
@@ -94,7 +108,7 @@ def _train_plan(sp: Split):
 def _plan_meta(plan, clip_labels):
     s = np.concatenate([np.full(len(c), sub) for sub, c, _ in plan])
     c = np.concatenate([np.asarray(c) for _, c, _ in plan])
-    return s, c, np.asarray(clip_labels)[c]
+    return s, c, _lab_at(clip_labels, s, c)
 
 
 def _test_clips(sp: Split, conds: dict) -> list[int]:
@@ -117,7 +131,7 @@ def tk_conditions(sp: Split) -> dict:
 def _trial_meta(subjects, clips, clip_labels):
     s = np.repeat(np.asarray(subjects), len(clips))
     c = np.tile(np.asarray(clips), len(subjects))
-    return s, c, np.asarray(clip_labels)[c]
+    return s, c, _lab_at(clip_labels, s, c)
 
 
 def raw_rms(ctx: Context, jd: JobData, subjects, clips, band) -> float:
@@ -233,6 +247,7 @@ def run_const(job: Job, ctx: Context, cfg: ExpConfig) -> str:
     jd = prepare(job, ctx, cfg)
     sp = jd.split
     n_win = int(30 // cfg.window_s)
+    assert not is_sr(job.task), "predittore costante non previsto per i task da self-report"
     train_lab = np.repeat(jd.clip_labels[sp.train_clips], n_win * len(sp.train_subjects))
     maj = int(np.bincount(train_lab, minlength=jd.n_classes).argmax())
     rows, rec = [], {"job_id": job.job_id, "config": cfg.name, "majority_class": maj}
@@ -285,7 +300,18 @@ def _xy(feats, subjects, clips, clip_labels, zsub_clips=None):
         S.append(np.full(Fx.shape[0] * Fx.shape[1], s))
         Cc.append(np.repeat(cl, Fx.shape[1]))
     X, S, Cc = np.concatenate(X), np.concatenate(S), np.concatenate(Cc)
-    return X, S, Cc, np.asarray(clip_labels)[Cc]
+    y = _lab_at(clip_labels, S, Cc)
+    keep = y >= 0                      # task da self-report: trial senza label (pareggi, item costante)
+    return X[keep], S[keep], Cc[keep], y[keep]
+
+
+def _clipres(xy):
+    X, S, Cc, y = xy
+    X = X.copy()
+    for c in np.unique(Cc):
+        m = Cc == c
+        X[m] -= X[m].mean(0)
+    return X, S, Cc, y
 
 
 def _fit_clf(kind, C, X, y, seed=0):
@@ -327,6 +353,9 @@ def run_features(job: Job, ctx: Context, cfg: ExpConfig) -> str:
         tr = _xy(feats, sp.train_subjects, sp.subject_train_clips, lab, sp.subject_train_clips if z else None)
         va = _xy(feats, sp.val_subjects, sp.train_clips, lab, sp.train_clips if z else None)
         te = {cond: _xy(feats, sp.test_subjects, cl, lab, all_eval if z else None) for cond, cl in conds.items()}
+        if cfg.feature_clipres:      # ogni insieme toglie la media della clip calcolata sui propri soggetti
+            tr, va = _clipres(tr), _clipres(va)
+            te = {cond: _clipres(v) for cond, v in te.items()}
         return tr, va, te
 
     tr, va, te = data(jd.clip_labels)
@@ -361,12 +390,22 @@ def run_features(job: Job, ctx: Context, cfg: ExpConfig) -> str:
     if job.n_perm and job.perm is None:
         task_clips = ctx.adapter.task_clips(job.task)
         null = {cond: [] for cond in conds}
+        sr_perm = {}
         for k in range(job.n_perm):
-            lab_k = permute_clip_labels(jd.clip_labels, k, task_clips)
+            if is_sr(job.task):
+                from ..selfreport.table import load_votes
+                from ..selfreport.targets import label_matrix
+                lab_k = label_matrix(job.task, load_votes(synthetic=ctx.adapter.synthetic), jd.clip_labels.shape[0], sp,
+                                     perm=k)
+            else:
+                lab_k = permute_clip_labels(jd.clip_labels, k, task_clips)
             trk, _, tek = data(lab_k)
             mk = _fit_clf(kind, C, trk[0], trk[3], job.seed)
             for cond, (X, S, Cc, y) in tek.items():
-                ev = evaluate_predictions(_proba(mk, X, jd.n_classes), S, Cc, y)
+                Pk = _proba(mk, X, jd.n_classes)
+                if is_sr(job.task):
+                    sr_perm.setdefault(cond, []).append((Pk, S, Cc))
+                ev = evaluate_predictions(Pk, S, Cc, y)
                 null[cond].append(subject_mean(ev["per_subject"]))
                 if sp.is_lco or sp.is_sizematched:  # serve per la correzione del Δstim, per soggetto
                     rows += result_rows(job, cfg.name, ev, cond, _join(job.variant, f"perm{k}"), extra)
@@ -376,12 +415,58 @@ def run_features(job: Job, ctx: Context, cfg: ExpConfig) -> str:
             rec[f"perm_{cond}"] = {"observed": obs, "null_mean": float(nl.mean()),
                                    "null_p95": float(np.percentile(nl, 95)),
                                    "p": float((1 + np.sum(nl >= obs)) / (1 + len(nl))), "n_perm": len(nl)}
+    if is_sr(job.task):
+        save_sr_preds(job, jd, {c: v[:3] for c, v in preds.items() if c in conds and not c.startswith("tk")},
+                      perms=locals().get("sr_perm") or None)
     minutes = (time.time() - t0) / 60
     for r in rows:
         r["minutes"] = round(minutes, 2)
     rec["minutes"] = minutes
     _write(job, ctx, rows, rec)
     return "completed"
+
+
+def _trial_level(P, S, C, n_classes):
+    """Predizioni per trial: media sulle finestre del log-odds della classe "alta" (binario) e delle
+    probabilità (tutti i task). Ritorna (soggetti, clip, p, probs)."""
+    key = S.astype(np.int64) * 1000 + C.astype(np.int64)
+    uk, inv = np.unique(key, return_inverse=True)
+    P = np.asarray(P, dtype=np.float64)
+    probs = np.zeros((len(uk), P.shape[1]))
+    np.add.at(probs, inv, P)
+    cnt = np.bincount(inv, minlength=len(uk))[:, None]
+    probs /= cnt
+    if n_classes == 2:
+        lo = np.log(P[:, 1] + 1e-6) - np.log(P[:, 0] + 1e-6)
+        p = np.bincount(inv, weights=lo, minlength=len(uk)) / cnt[:, 0]
+    else:
+        p = np.full(len(uk), np.nan)
+    return uk // 1000, uk % 1000, p, probs
+
+
+def save_sr_preds(job: Job, jd: JobData, conds: dict, perms: dict | None = None) -> None:
+    """Predizioni per trial dei task da self-report (Sessione 03): artifacts/srpreds/<job>.npz.
+    conds: condizione -> (P per finestra, soggetti, clip); perms: condizione -> [(P, S, C)] dei modelli
+    riaddestrati con i residui del voto permutati entro clip (solo baseline su feature)."""
+    out = {"subject": [], "clip": [], "cond": [], "p": [], "probs": [], "perm_p": []}
+    for cond, (P, S, Cc) in conds.items():
+        s, c, p, pr = _trial_level(P, S, Cc, jd.n_classes)
+        out["subject"].append(s); out["clip"].append(c); out["p"].append(p); out["probs"].append(pr)
+        out["cond"].append(np.full(len(s), cond))
+        if perms and cond in perms:
+            pp = []
+            for Pk, Sk, Ck in perms[cond]:
+                sk, ck, pk, _ = _trial_level(Pk, Sk, Ck, jd.n_classes)
+                m = dict(zip(zip(sk.tolist(), ck.tolist()), pk))
+                pp.append([m.get((a, b), np.nan) for a, b in zip(s.tolist(), c.tolist())])
+            out["perm_p"].append(np.asarray(pp).T)          # (trial, n_perm)
+    d = kaggle_env.state_dir() / "artifacts" / "srpreds"
+    d.mkdir(parents=True, exist_ok=True)
+    arr = {k: np.concatenate(v) for k, v in out.items() if v and k != "perm_p"}
+    if out["perm_p"]:
+        arr["perm_p"] = np.concatenate(out["perm_p"]).astype(np.float32)
+    np.savez_compressed(d / f"{job.job_id}.npz", **arr, protocol=job.protocol, fold=job.fold, seed=job.seed,
+                        task=job.task, variant=job.variant, perm=-1 if job.perm is None else job.perm)
 
 
 def _check_train_size(sp: Split, windows_per_trial: int, n_windows: int, job: Job) -> None:
@@ -438,19 +523,25 @@ def build_banks(job: Job, ctx: Context, jd: JobData, win_len: int, need_train=Tr
     if need_train:
         s, c, l = _plan_meta(plan, jd.clip_labels)
         banks["train"] = TrialBank(arrs["train"], s, c, l, win_len, jd.cfg.overlap_train, dev)
+        if is_sr(job.task):
+            banks["train"].keep(banks["train"].ws.label >= 0)
         ws = banks["train"].ws
         for sub in sp.train_subjects:   # nessuna finestra fuori dalle clip di training del suo soggetto
             m = ws.subject == sub
             check_windows_in_split(ws.subject[m], ws.clip[m], [sub], sp.subject_train_clips(sub), "train")
-        if sp.is_sizematched:
+        if sp.is_sizematched and not is_sr(job.task):
             per_trial = len(ws.win_trial) // max(1, len(ws.trial_subject))
             _check_train_size(sp, per_trial, banks["train"].n, job)
     s, c, l = _trial_meta(sp.val_subjects, sp.train_clips, jd.clip_labels)
     banks["val"] = TrialBank(arrs["val"], s, c, l, win_len, 0.0, dev)
+    if is_sr(job.task):
+        banks["val"].keep(banks["val"].ws.label >= 0)
     check_windows_in_split(banks["val"].ws.subject, banks["val"].ws.clip, sp.val_subjects, sp.train_clips, "val")
     if need_test:
         s, c, l = _trial_meta(sp.test_subjects, all_eval, jd.clip_labels)
         banks["test"] = TrialBank(arrs["test"], s, c, l, win_len, 0.0, dev)
+        if is_sr(job.task):
+            banks["test"].keep(banks["test"].ws.label >= 0)
         check_windows_in_split(banks["test"].ws.subject, banks["test"].ws.clip, sp.test_subjects, all_eval, "test")
     return banks
 
@@ -528,7 +619,7 @@ def run_neural(job: Job, ctx: Context, cfg: ExpConfig, hp_source: str) -> str:
         rows += result_rows(job, cfg.name, ev, cond, job.variant, extra)
         rec[f"pooled_{cond}"] = ev["pooled"]
         rec[f"confusion_{cond}"] = ev["confusion_win"]
-        if job.perm is None and cond in conds:
+        if job.perm is None and cond in conds and not is_sr(job.task):
             rec[f"testperm_{cond}"] = test_label_permutation(P[m], test.ws.subject[m], test.ws.clip[m],
                                                              test.ws.label[m], n_perm=1000, seed=job.seed)
     # predizioni salvate (servono a permutazioni/analisi successive)
@@ -536,6 +627,9 @@ def run_neural(job: Job, ctx: Context, cfg: ExpConfig, hp_source: str) -> str:
     pdir.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(pdir / f"{job.job_id}.npz", probs=P.astype(np.float16), subject=test.ws.subject,
                         clip=test.ws.clip, label=test.ws.label)
+    if is_sr(job.task):
+        save_sr_preds(job, jd, {cond: (P[np.isin(test.ws.clip, cl)], test.ws.subject[np.isin(test.ws.clip, cl)],
+                                       test.ws.clip[np.isin(test.ws.clip, cl)]) for cond, cl in conds.items()})
 
     # BN-α (regime offline e online), n0 scelto sulla validation
     if cfg.tta_bnalpha and has_bn(model) and job.perm is None and not job.overrides.get("skip_tta") \
@@ -556,7 +650,7 @@ def run_neural(job: Job, ctx: Context, cfg: ExpConfig, hp_source: str) -> str:
                     rows += result_rows(job, f"{cfg.name}_bnalpha", ev, cond,
                                         _join(job.variant, tv.replace(f"_n0{n0_sel}", "_n0sel")), extra)
     # sonda dell'identità della clip (solo split senza LCO)
-    if job.probe and not sp.is_lco:
+    if job.probe and not sp.is_lco and not is_sr(job.task):
         from ..eval.shortcuts import clip_probe
         tr = banks["train"]
         idx_tr = np.where(np.isin(tr.ws.win_start % win_len, [0]))[0]   # finestre non sovrapposte

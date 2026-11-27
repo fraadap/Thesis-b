@@ -302,11 +302,11 @@ def make_results_zip(account: str) -> Path:
     st = kaggle_env.state_dir()
     out = kaggle_env.working_dir() / f"results_{account}.zip"
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-        for sub in ("results", "done", "hpo_best", "bench", "logs", "optuna"):
+        for sub in ("results", "done", "hpo_best", "bench", "logs", "optuna", "selfreport"):
             for f in (st / sub).rglob("*"):
                 if f.is_file():
                     z.write(f, f"{kaggle_env.STATE_DIRNAME}/{f.relative_to(st)}")
-        for f in (st / "artifacts" / "preds").glob("*.npz"):
+        for f in [*(st / "artifacts" / "preds").glob("*.npz"), *(st / "artifacts" / "srpreds").glob("*.npz")]:
             z.write(f, f"{kaggle_env.STATE_DIRNAME}/{f.relative_to(st)}")
         s = kaggle_env.working_dir() / f"summary_{account}.json"
         if s.exists():

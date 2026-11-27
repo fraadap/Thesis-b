@@ -509,9 +509,71 @@ def dataclasses_replace(job: Job, **kw) -> Job:
     return replace(job, **kw)
 
 
+# ------------------------------------------------------------------ Sessione 03: label da self-report
+SR_PRIMARY = ["sr_val_bin", "sr_aro_bin"]
+SR_RES = ["sr_val_res", "sr_aro_res"]
+SR_SECONDARY = ["sr_val_bin_strict", "sr_argmax8", "sr_lik_bin", "sr_fam_bin"]
+# TSception: la configurazione "metodologia originale" (finestre da 10 s) è migliore in validation su split FM
+# (BA media 0.238 su 3 seed contro 0.234 su 5 seed di tsception_ea): si usa quella (prompt 03, §4.1 H4)
+SR_TSCEPTION = "tsception_ding_ea"
+
+
+def queue_H() -> list[Job]:
+    """Notebook H (feature e TSception sui target da self-report), in ordine di priorità. H1 (descrittive) e H2
+    (rianalisi delle predizioni salvate) girano nel notebook prima della coda, senza training."""
+    D = "de_asym_lr_zsub"
+    J = []
+    # H3: DE + z-score. Prima i job della terza famiglia (lnso10_lco) e la valenza di categoria per il confronto 4
+    J += [Job("train", D, "lnso10_lco", f, 0, t, n_perm=50) for t in SR_PRIMARY for f in _folds("lnso10_lco")]
+    J += [Job("train", D, p, f, 0, "val2") for p in ("lnso10_lco", "split_fm_lco") for f in _folds(p)]
+    J += [Job("train", D, p, f, 0, t, n_perm=50) for t in SR_PRIMARY for p in ("split_fm", "split_fm_lco", "lnso10")
+          for f in _folds(p)]
+    J += [Job("train", D, p, f, 0, t, n_perm=50) for t in SR_RES for p in ("split_fm_lco", "lnso10_lco") for f in _folds(p)]
+    J += [Job("train", D, p, f, 0, t, n_perm=0 if t == "sr_argmax8" else 20) for t in SR_SECONDARY
+          for p in ("split_fm_lco", "lnso10_lco") for f in _folds(p)]
+    # robustezza (§5): z e mediana dalle sole clip di training; feature residualizzate sulla clip
+    J += [Job("train", D, "split_fm_lco", f, 0, "sr_val_bintr", n_perm=20) for f in _folds("split_fm_lco")]
+    J += [Job("train", "de_asym_lr_zsub_clipres", p, f, 0, t, n_perm=20) for t in SR_RES
+          for p in ("split_fm_lco", "lnso10_lco") for f in _folds(p)]
+    # H4: TSception (3 seed su split FM e leave-clip-out, 1 permutato entro clip per fold)
+    T = SR_TSCEPTION
+    for t in SR_PRIMARY:
+        J += train_jobs(T, ["split_fm", "split_fm_lco"], SEEDS3, task=t)
+        J += [Job("train", T, p, f, 0, t, perm=0) for p in ("split_fm", "split_fm_lco") for f in _folds(p)]
+    J += [Job("train", T, "split_fm_lco", f, 0, "sr_val_bintr") for f in _folds("split_fm_lco")]
+    for t in SR_PRIMARY:
+        J += train_jobs(T, ["lnso10_lco"], [0], task=t)
+    J += [Job("train", T, "lnso10_lco", f, 0, t, perm=0) for t in SR_PRIMARY for f in _folds("lnso10_lco")]
+    J += [Job("train", T, "lnso10_lco", f, 0, t) for t in SR_RES for f in _folds("lnso10_lco")]
+    J += train_jobs(T, ["split_fm_lco"], [0], task="sr_argmax8")           # opzionale
+    return J
+
+
+def queue_I() -> list[Job]:
+    """Notebook I (CBraMod, ricetta ufficiale: la configurazione finale non è ancora decisa) sui target da
+    self-report, in ordine di priorità: valenza, arousal, 10 fold, da zero (opz.), REVE (opz., solo con il Gate R
+    passato; i job si saltano altrimenti)."""
+    C = "cbramod_ft_official"
+    J = []
+    for t in SR_PRIMARY:
+        J += train_jobs(C, ["split_fm", "split_fm_lco"], CBRAMOD_SEEDS3, task=t)
+        J += [Job("train", C, "split_fm_lco", f, 3407, t, perm=0) for f in _folds("split_fm_lco")]
+    for t in SR_PRIMARY:
+        J += train_jobs(C, ["lnso10_lco"], [3407], task=t)
+    J += train_jobs("cbramod_scratch_ft_warmup", ["split_fm_lco"], CBRAMOD_SEEDS3, task="sr_val_bin")
+    gate = {"needs_gate_r": True}
+    E = {"split_fm": 45, "split_fm_lco": 35}
+    for t in SR_PRIMARY:
+        J += [Job("train", "reve_base", p, f, s, t, overrides=dict(gate), est_min=E[p])
+              for p in ("split_fm", "split_fm_lco") for f in _folds(p) for s in SEEDS3]
+        J += [Job("train", "reve_base", "split_fm_lco", f, 0, t, perm=0, overrides=dict(gate), est_min=35)
+              for f in _folds("split_fm_lco")]
+    return J
+
+
 QUEUES = {"nb0_smoke": queue_nb0, "nbA_baselines_tsception": queue_nbA, "nbB_cbramod_gate": queue_nbB,
           "nbC_cbramod_main": queue_nbC, "nbD_lnso10": queue_nbD, "nbE_eegnet": queue_nbE,
-          "F": queue_F, "F_bis": queue_F_bis, "G": queue_G}
+          "F": queue_F, "F_bis": queue_F_bis, "G": queue_G, "H": queue_H, "I": queue_I}
 
 
 def main():

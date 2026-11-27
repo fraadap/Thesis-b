@@ -31,7 +31,8 @@ def print_env() -> dict:
     return info
 
 
-def run_queue(queue: str, gpus: str = "auto", synthetic: bool = False, skip_bench: bool = False) -> int:
+def run_queue(queue: str, gpus: str = "auto", synthetic: bool = False, skip_bench: bool = False,
+              cpu_workers: int = 0) -> int:
     """Esegue `python -m pianob.run` in un sottoprocesso mostrando l'output riga per riga."""
     code_root = Path(__file__).resolve().parents[1]
     qpath = code_root / "queues" / f"{queue}.json"
@@ -42,6 +43,8 @@ def run_queue(queue: str, gpus: str = "auto", synthetic: bool = False, skip_benc
         cmd.append("--synthetic")
     if skip_bench:
         cmd.append("--skip-bench")
+    if cpu_workers:
+        cmd += ["--cpu-workers", str(cpu_workers)]
     banner(f"Esecuzione coda {queue}")
     p = subprocess.Popen(cmd, cwd=str(code_root), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                          env=dict(os.environ))

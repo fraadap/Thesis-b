@@ -37,6 +37,12 @@ class TrialBank:
     def n(self):
         return self.ws.n
 
+    def keep(self, mask) -> "TrialBank":
+        """Tiene solo le finestre indicate (es. trial senza label nei task da self-report)."""
+        self.ws = self.ws.subset(np.asarray(mask, dtype=bool))
+        self.win_label = torch.as_tensor(self.ws.label, dtype=torch.long)
+        return self
+
     def get(self, idx, device) -> torch.Tensor:
         idx_t = torch.as_tensor(idx, dtype=torch.long)
         x = gather_windows_torch(self.data, torch.as_tensor(self.ws.win_trial[idx]),

@@ -12,7 +12,8 @@ KAGGLE_INPUT = Path("/kaggle/input")
 KAGGLE_WORKING = Path("/kaggle/working")
 STATE_DIRNAME = "pianob_state"
 # Sottocartelle dello stato che si portano da una sessione all'altra.
-PERSISTENT_SUBDIRS = ["results", "done", "ckpt", "optuna", "hpo_best", "models", "bench", "artifacts", "logs"]
+PERSISTENT_SUBDIRS = ["results", "done", "ckpt", "optuna", "hpo_best", "models", "bench", "artifacts", "logs",
+                      "selfreport"]
 
 
 def on_kaggle() -> bool:
@@ -130,8 +131,16 @@ def restore_state_from_inputs(verbose: bool = True) -> dict:
     output di sessioni precedenti collegati come input. Non sovrascrive file più recenti."""
     dst = state_dir()
     copied = {}
+    account = os.environ.get("PIANOB_ACCOUNT")
     for src_state in find_dir(STATE_DIRNAME):
         if dst.resolve() == src_state.resolve():
+            continue
+        # Sessione 03: con PIANOB_ACCOUNT si riprendono solo gli output dello stesso notebook (summary_<account>
+        # accanto allo stato, o nessun summary); quelli degli altri notebook restano input in sola lettura
+        others = [p.stem[len("summary_"):] for p in src_state.parent.glob("summary_*.json")]
+        if account and others and account not in others:
+            if verbose:
+                print(f"[ripresa] {src_state.parent.name}: output di {others}, non ripreso (solo lettura)")
             continue
         for sub in PERSISTENT_SUBDIRS:
             s = src_state / sub

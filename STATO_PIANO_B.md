@@ -17,6 +17,9 @@ Contributo atteso:
 ## Passo corrente
 
 **Sessione 02 in corso** (dettagli nella sezione "Sessione 02" più sotto).
+Sessione 03 pronta (notebook H e I, sezione C3 di README_KAGGLE): prima aggiungere i file comportamentali di FACED al
+Dataset dei dati e ricostruire lo zip del codice.
+
 In esecuzione (codice `8b3cd8e`):
 1. notebook F, seconda sessione (account S edge 2), con in input `results_nbF_ricetta_pretraining`: 12 candidati, riselezione
    (`select__cbramod_twophase`), controllo di sanità e Parte A ripetuta, 43 job, circa 6 ore;
@@ -26,6 +29,62 @@ In esecuzione (codice `8b3cd8e`):
    circa 2–3 sessioni;
 3. dopo F: regola A.4 (F_bis sì o no) e seconda famiglia con i job a due fasi validi; dopo le prime ore di G: Gate R2 (5 seed);
 4. notebook D: ✅ completato il 2026-11-27 (360/360).
+
+## Sessione 03 (2026-11-27): label da self-report, componente della clip e componente individuale
+
+Prompt: `PROMPT_PIANOB-03_selfreport.md`. Le label diventano i **voti dati da ogni soggetto dopo ogni clip**; il
+voto si scompone in media della clip (mu, ottenibile memorizzando la clip sulle clip viste) e scarto individuale
+(r, che un modello che riconosce solo la clip non può predire). Disegno 2 x 2: componente tra / entro clip x
+clip viste / non viste. **Terza famiglia** (aggiunta successiva, Holm solo su queste 4, unilaterali), modello
+fissato a priori DE + z-score su `lnso10_lco`:
+
+| | Ipotesi |
+|---|---|
+| T1 | Valenza, componente individuale, clip non viste: correlazione dei residui a due vie > 0 (nullo: residui del voto permutati entro clip) |
+| T2 | Arousal, come T1 |
+| T3 | Valenza, tra clip, clip non viste: correlazione tra medie per clip > 0 (nullo: clip permutate) |
+| T4 | BA di `sr_val_bin` > BA della valenza di categoria (`val2`), clip non viste, appaiata per soggetto (ciascuna contro la propria label) |
+
+**Codice (pronto, testato su dati sintetici; nessun comportamento esistente cambiato):**
+- `pianob/selfreport/`: `table` (passo 0: lettura di After_remarks .mat/.pkl, allineamento delle righe deciso
+  dalla concordanza argmax8/categoria, controlli bloccanti, colonne z / bin / bin_strict / argmax8 / concordant,
+  hash del contenuto), `targets` (task `sr_*`, scarto entro clip con mu dai soli soggetti di training escluso il
+  soggetto stesso, permutazione al training dei residui entro clip), `metrics` (residui a due vie, entro clip,
+  tra clip, entro soggetto; bootstrap incrociato e sui soggetti; permutazione dei residui entro clip con il
+  controllo della ricentratura; ANOVA a effetti casuali incrociati, ICC, split-half, effetto minimo rilevabile),
+  `analysis` (unione dei fold, tabelle 2 x 2, rianalisi H2 delle predizioni a 9 classi, terza famiglia).
+- Pipeline: label per (soggetto, clip) nei job su feature e neurali, trial senza label esclusi, predizioni per
+  trial salvate in `artifacts/srpreds/` (con i modelli permutati interni per DE). Config nuova
+  `de_asym_lr_zsub_clipres` (feature residualizzate sulla clip, §5).
+- Code `H` (606 job: DE + z-score con 50 / 20 permutazioni entro clip, TSception) e `I` (129 job: CBraMod
+  ricetta ufficiale, da zero, REVE solo se il Gate R è passato). Notebook `nbH_selfreport_feature`,
+  `nbI_selfreport_cbramod`. Worker solo-CPU per le baseline su feature (`--cpu-workers`). Aggregatore: sezione
+  "Sessione 03".
+
+**Scelte registrate [DA VERIFICARE sui file veri]:**
+- struttura di After_remarks: accettati dict con `score` 28 x 12 (o 12 x 28) e array di struct 1 x 28; allineamento
+  scelto se la concordanza differisce di almeno 0.2, altrimenti stop; concordanza media < 0.2 = stop; ordine delle
+  colonne accettato con almeno 6 item discreti su 8 col massimo sulla propria categoria e valenza positive > negative;
+- `Stimuli_info.xlsx`: se c'è, deve coincidere con la mappa clip -> classe; se manca, vale la concordanza;
+- hash: SHA-256 del contenuto canonico (CSV a formato fisso), non dei byte del parquet (dipendono da pyarrow);
+- TSception: `tsception_ding_ea` (metodologia originale, finestre da 10 s), migliore in validation su split FM
+  (0.238 su 3 seed contro 0.234 su 5 seed di `tsception_ea`; differenza minima);
+- CBraMod: ricetta ufficiale (la configurazione finale non è decisa); niente EA;
+- IC e p si calcolano sulla predizione mediata sui seed; la metrica riportata è la media delle metriche per seed;
+- nulli della correlazione tra clip: permutazione delle clip della predizione;
+- label `*_res` di test sulle clip non viste: mu dai voti dei soggetti di training su quelle clip (solo
+  valutazione, mai training).
+
+**Budget:** la coda H è più pesante della stima del prompt: circa 220 job TSception (con i 10 fold, i permutati e
+gli scarti) e circa 390 job DE con le permutazioni (diverse ore di CPU anche con 2 worker solo-CPU). È ordinata per
+priorità: prima i job della terza famiglia, poi TSception su split FM e leave-clip-out; i 10 fold di TSception
+sono in fondo. Servono 2-3 sessioni.
+
+**Contaminazione del pretraining (§5):**
+- CBraMod: pre-addestrato solo su TUEG (Temple University Hospital EEG Corpus); FACED solo come compito a valle.
+- REVE: 92 dataset, circa 60 000 ore; secondo il paper (versione NeurIPS) e due analisi successive, i dati di
+  valutazione a valle sono esclusi dal pretraining e FACED è tra i compiti a valle. Lista completa (Tabella 7 del
+  paper) [DA VERIFICARE direttamente: arxiv.org non è raggiungibile da questa sessione].
 
 ## Sessione 02 (2026-11-25): ricetta a due fasi, pretraining su clip non viste, REVE-Base
 
