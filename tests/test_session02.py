@@ -178,8 +178,14 @@ def test_queues_session02():
     F, G = QUEUES["F"](), QUEUES["G"]()
     hpo = [j.job_id for j in F if j.kind == "hpo"]
     sanity = [j for j in F if j.overrides.get("sanity_min_val")]
-    assert len(hpo) == 2 and len(sanity) == 1 and set(sanity[0].depends_on) == set(hpo)
-    partA = [j for j in F if j.config.startswith("cbramod_twophase") and j.kind == "train" and j is not sanity[0]]
+    sel = [j for j in F if j.kind == "select"]
+    cands = [j for j in F if j.overrides.get("hpo_params")]
+    assert len(hpo) == 2 and len(sanity) == 1 and len(sel) == 1 and sanity[0].depends_on == [sel[0].job_id]
+    # riselezione: candidati dopo Optuna, selezione dopo tutti i candidati, id distinti dai job della Parte A
+    assert len(cands) == 12 and all(set(hpo) <= set(j.depends_on) for j in cands)
+    assert set(sel[0].depends_on) == {j.job_id for j in cands} and all("__cand" in j.job_id for j in cands)
+    partA = [j for j in F if j.config.startswith("cbramod_twophase") and j.kind == "train" and j is not sanity[0]
+             and not j.overrides.get("hpo_params")]
     assert all(sanity[0].job_id in j.depends_on for j in partA)
     assert [j.config for j in G[:2]] == ["reve_base_lp", "reve_base"]
     assert sum(1 for j in G if j.config == "reve_base" and j.protocol == "split_fm_lco" and j.perm is None

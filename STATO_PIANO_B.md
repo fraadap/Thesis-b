@@ -16,15 +16,28 @@ Contributo atteso:
 
 ## Passo corrente
 
-**Sessione 02: codice pronto e testato su dati sintetici e CPU** (dettagli nella sezione "Sessione 02" più sotto).
+**Sessione 02 in corso** (dettagli nella sezione "Sessione 02" più sotto).
 Prossime azioni dell'utente:
 1. ricostruire lo zip del codice;
-2. notebook F (coda `F`) su un account libero;
+2. notebook F: rilanciarlo con in input l'output della prima sessione (`results_nbF_ricetta_pretraining`).
+   Partono solo i 43 job della riselezione e della Parte A ripetuta (circa 6 ore con 2 worker);
 3. notebook G (coda `G`) su un account dedicato, dopo aver creato il Secret `HF_TOKEN` e attivato Internet
    (README_KAGGLE.md, sezione C2);
 4. notebook D: ✅ completato il 2026-11-27 (360/360).
 
 ## Sessione 02 (2026-11-25): ricetta a due fasi, pretraining su clip non viste, REVE-Base
+
+**Notebook F, prima sessione (2026-11-27, codice `d780163`, 50/50 job).**
+- **Optuna (31 trial, 16 completati):** vince la testa appiattita (trial 27, validation 0.607). Le teste a pooling restano basse: per canale con standardizzazione per sessione 0.296, globale 0.227.
+- **La configurazione vincente collassa.** Con il trial 27 la fase LP (solo testa, lr 2.3e-3) non impara mai: validation 1/9 in tutte le epoche LP. Il fine-tuning a volte recupera, a volte resta su una classe costante. Job collassati: 1/3 su split FM, 4/9 sul leave-clip-out, 2/6 permutati, 12/12 da zero (da zero la loss della LP parte da 14.7). Il trial 27 era l'unico con LP piatta in Optuna e ha vinto con un seed fortunato. I trial 21, 16 e 19 imparano già nella LP (validation 0.23–0.33 alla prima epoca).
+- **Rimedio (scelta solo in validation):** riselezione tra i 4 migliori trial con 3 seed ciascuno su split FM; vince la media della BA di validation, e un collasso conta come caso. Poi si ripete la Parte A con la configurazione scelta (job `select__cbramod_twophase` nella coda F). I job a due fasi del primo giro sono invalidati (`INVALIDATED`, con orario di taglio) e l'aggregatore segnala i job collassati.
+- Sui job a due fasi **non collassati**, le clip nuove restano al caso (circa 0.110). La regola A.4 provvisoria dice di non lanciare F_bis, da confermare dopo la ripetizione.
+- **Parte B (valida, 3 seed per fold, 23 soggetti), leave-clip-out:**
+  - ricetta ufficiale pre-addestrata (0.588 / 0.111) contro da zero con warm-up (0.570 / **0.123**): viste +1.9 (p 0.02), nuove −1.2 (IC95 −2.4/−0.0, p 0.065), interazione +3.1 (p 0.003). **S1: p Holm 0.13, non significativa; il segno è contrario al pretraining sulle clip nuove**;
+  - stessa ricetta con warm-up, pre-addestrato (0.532 / 0.121) contro da zero (0.570 / 0.123): viste −3.8 (p 7e-5), nuove −0.2 (n.s.);
+  - da zero con warm-up, clip nuove contro il caso: +1.2 (p 0.015); pre-addestrato con warm-up: +1.0 (p 0.07).
+  - **Lettura:** il pretraining non porta nulla sulle clip nuove. Dove aiuta, aiuta solo sulle clip viste.
+- Tempi: la ricetta a due fasi pre-addestrata richiede 13.6 min a job (LP 0.7 min, 3 epoche; FT circa 27 epoche); i job collassati si fermano dopo 5–8 minuti.
 
 Prompt: `PROMPT_PIANOB-02_LPFT_pretraining.md`. Le quattro ipotesi primarie restano invariate. Le nuove analisi
 formano una **seconda famiglia** (aggiunta successiva, Holm solo su queste 4); tutto il resto è esplorativo:
@@ -258,6 +271,7 @@ soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binari
 | 19 | 26/11 | 4 / E (ripresa) | 6/6 | Permutati di EEGNet + EA a 4–47 Hz: memorizzazione 22.3 (contro 38.0 a banda piena); divario viste/non viste interamente memorizzazione (corretto −3.7); le clip nuove a 0.136 (+2.5) restano una generalizzazione reale. |
 | 20 | 26/11 | rotazione / D (ripresa) | 345/360 | **DE + z-score sulle clip nuove: 0.166 (+5.5 sul caso), meglio di TSception (+2.1, p 4e-6) e di CBraMod (+5.8 su 60 soggetti)**. Permutati di TSception: memorizzazione 15.7, corretto −2.1. DE + z-score: scomposizione corretta −1.7. ΔEMG TSception su 123 soggetti +1.4 (p 0.001). Restano 15 fold di CBraMod (codice vecchio). |
 | 21 | 27/11 | S edge 2 / D (ripresa) | 15/15 | **CBraMod LoRA sulle clip nuove con 123 soggetti: viste 0.696, nuove 0.124 (+1.3 sul caso, p 1e-4)**: con piena potenza un residuo minimo sopra il caso, sotto TSception (−2.1) e DE + z-score (−4.2). Solo 2 fold su 30 superano il test di permutazione interno. Notebook D completo. |
+| 22 | 26–27/11 | Z edge 3 / F | 50/50 | Optuna a due fasi: vince la testa appiattita (trial 27, 0.607), ma **collassa a classe costante** in 19 job su 33 a due fasi (tutti i 12 da zero). Riselezione su 3 seed in coda. Parte B: pretraining sulle clip nuove −1.2 (p 0.065; S1 p Holm 0.13); da zero con warm-up 0.123 sulle clip nuove. |
 
 **Risultati del notebook C (2026-11-24), 23 soggetti, caso 0.111:**
 - **Clip non viste (risultato centrale):**

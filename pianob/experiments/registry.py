@@ -186,11 +186,18 @@ def find_hpo_best(study: str) -> Path | None:
     return pkg if pkg.exists() else None
 
 
-def resolve_config(name: str, require_hpo: bool = False) -> tuple[ExpConfig, str]:
-    """Config con gli iperparametri Optuna applicati (se disponibili). Ritorna (cfg, sorgente_hp)."""
+def resolve_config(name: str, require_hpo: bool = False, params: dict | None = None) -> tuple[ExpConfig, str]:
+    """Config con gli iperparametri Optuna applicati (se disponibili). Ritorna (cfg, sorgente_hp).
+    `params`: parametri espliciti di un trial (candidati della riselezione su più seed), al posto del migliore."""
     import os
     require_hpo = require_hpo or os.environ.get("PIANOB_REQUIRE_HPO") == "1"
     cfg = get_config(name)
+    if params is not None:
+        from ..hpo.search_spaces import apply_params
+        params = dict(params)
+        if params.get("head") == "flat_official":
+            params["subj_embed_norm"] = "none"
+        return apply_params(cfg, params), "candidato esplicito"
     if not cfg.hpo_study:
         return cfg, "registry"
     p = find_hpo_best(cfg.hpo_study)

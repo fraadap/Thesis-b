@@ -55,11 +55,567 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {
-   "sanity_min_val": 0.2
+   "hpo_params": {
+    "head": "flat_official",
+    "lp_epochs": 3,
+    "ft_epochs": 50,
+    "lr_head_lp": 0.002322504041186585,
+    "lr_backbone_ft": 9.846858230769367e-05,
+    "lr_head_ft": 0.0005344318145710877,
+    "warmup_frac": 0.05,
+    "label_smoothing": 0.1,
+    "dropout": 0.3222104032339131
+   },
+   "tag": "cand27"
   },
   "depends_on": [
    "hpo__cbramod_twophase__shard0",
    "hpo__cbramod_twophase__shard1"
+  ],
+  "est_min": 0.0,
+  "job_id": "cbramod_twophase_pre__split_fm__f0__s3407__emo9__cand27"
+ },
+ {
+  "kind": "train",
+  "config": "cbramod_twophase_pre",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 1,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "hpo_params": {
+    "head": "flat_official",
+    "lp_epochs": 3,
+    "ft_epochs": 50,
+    "lr_head_lp": 0.002322504041186585,
+    "lr_backbone_ft": 9.846858230769367e-05,
+    "lr_head_ft": 0.0005344318145710877,
+    "warmup_frac": 0.05,
+    "label_smoothing": 0.1,
+    "dropout": 0.3222104032339131
+   },
+   "tag": "cand27"
+  },
+  "depends_on": [
+   "hpo__cbramod_twophase__shard0",
+   "hpo__cbramod_twophase__shard1"
+  ],
+  "est_min": 0.0,
+  "job_id": "cbramod_twophase_pre__split_fm__f0__s1__emo9__cand27"
+ },
+ {
+  "kind": "train",
+  "config": "cbramod_twophase_pre",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 2,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "hpo_params": {
+    "head": "flat_official",
+    "lp_epochs": 3,
+    "ft_epochs": 50,
+    "lr_head_lp": 0.002322504041186585,
+    "lr_backbone_ft": 9.846858230769367e-05,
+    "lr_head_ft": 0.0005344318145710877,
+    "warmup_frac": 0.05,
+    "label_smoothing": 0.1,
+    "dropout": 0.3222104032339131
+   },
+   "tag": "cand27"
+  },
+  "depends_on": [
+   "hpo__cbramod_twophase__shard0",
+   "hpo__cbramod_twophase__shard1"
+  ],
+  "est_min": 0.0,
+  "job_id": "cbramod_twophase_pre__split_fm__f0__s2__emo9__cand27"
+ },
+ {
+  "kind": "train",
+  "config": "cbramod_twophase_pre",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 3407,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "hpo_params": {
+    "head": "flat_official",
+    "lp_epochs": 3,
+    "ft_epochs": 50,
+    "lr_head_lp": 0.0009335728137150592,
+    "lr_backbone_ft": 6.487080536900984e-05,
+    "lr_head_ft": 0.0009328763170970731,
+    "warmup_frac": 0.05,
+    "label_smoothing": 0.1,
+    "dropout": 0.11238872478693124
+   },
+   "tag": "cand21"
+  },
+  "depends_on": [
+   "hpo__cbramod_twophase__shard0",
+   "hpo__cbramod_twophase__shard1"
+  ],
+  "est_min": 0.0,
+  "job_id": "cbramod_twophase_pre__split_fm__f0__s3407__emo9__cand21"
+ },
+ {
+  "kind": "train",
+  "config": "cbramod_twophase_pre",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 1,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "hpo_params": {
+    "head": "flat_official",
+    "lp_epochs": 3,
+    "ft_epochs": 50,
+    "lr_head_lp": 0.0009335728137150592,
+    "lr_backbone_ft": 6.487080536900984e-05,
+    "lr_head_ft": 0.0009328763170970731,
+    "warmup_frac": 0.05,
+    "label_smoothing": 0.1,
+    "dropout": 0.11238872478693124
+   },
+   "tag": "cand21"
+  },
+  "depends_on": [
+   "hpo__cbramod_twophase__shard0",
+   "hpo__cbramod_twophase__shard1"
+  ],
+  "est_min": 0.0,
+  "job_id": "cbramod_twophase_pre__split_fm__f0__s1__emo9__cand21"
+ },
+ {
+  "kind": "train",
+  "config": "cbramod_twophase_pre",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 2,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "hpo_params": {
+    "head": "flat_official",
+    "lp_epochs": 3,
+    "ft_epochs": 50,
+    "lr_head_lp": 0.0009335728137150592,
+    "lr_backbone_ft": 6.487080536900984e-05,
+    "lr_head_ft": 0.0009328763170970731,
+    "warmup_frac": 0.05,
+    "label_smoothing": 0.1,
+    "dropout": 0.11238872478693124
+   },
+   "tag": "cand21"
+  },
+  "depends_on": [
+   "hpo__cbramod_twophase__shard0",
+   "hpo__cbramod_twophase__shard1"
+  ],
+  "est_min": 0.0,
+  "job_id": "cbramod_twophase_pre__split_fm__f0__s2__emo9__cand21"
+ },
+ {
+  "kind": "train",
+  "config": "cbramod_twophase_pre",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 3407,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "hpo_params": {
+    "head": "flat_official",
+    "lp_epochs": 3,
+    "ft_epochs": 50,
+    "lr_head_lp": 0.0006019613842280753,
+    "lr_backbone_ft": 7.33510935567048e-05,
+    "lr_head_ft": 0.0006079959274215075,
+    "warmup_frac": 0.05,
+    "label_smoothing": 0.1,
+    "dropout": 0.39861318777567445
+   },
+   "tag": "cand16"
+  },
+  "depends_on": [
+   "hpo__cbramod_twophase__shard0",
+   "hpo__cbramod_twophase__shard1"
+  ],
+  "est_min": 0.0,
+  "job_id": "cbramod_twophase_pre__split_fm__f0__s3407__emo9__cand16"
+ },
+ {
+  "kind": "train",
+  "config": "cbramod_twophase_pre",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 1,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "hpo_params": {
+    "head": "flat_official",
+    "lp_epochs": 3,
+    "ft_epochs": 50,
+    "lr_head_lp": 0.0006019613842280753,
+    "lr_backbone_ft": 7.33510935567048e-05,
+    "lr_head_ft": 0.0006079959274215075,
+    "warmup_frac": 0.05,
+    "label_smoothing": 0.1,
+    "dropout": 0.39861318777567445
+   },
+   "tag": "cand16"
+  },
+  "depends_on": [
+   "hpo__cbramod_twophase__shard0",
+   "hpo__cbramod_twophase__shard1"
+  ],
+  "est_min": 0.0,
+  "job_id": "cbramod_twophase_pre__split_fm__f0__s1__emo9__cand16"
+ },
+ {
+  "kind": "train",
+  "config": "cbramod_twophase_pre",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 2,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "hpo_params": {
+    "head": "flat_official",
+    "lp_epochs": 3,
+    "ft_epochs": 50,
+    "lr_head_lp": 0.0006019613842280753,
+    "lr_backbone_ft": 7.33510935567048e-05,
+    "lr_head_ft": 0.0006079959274215075,
+    "warmup_frac": 0.05,
+    "label_smoothing": 0.1,
+    "dropout": 0.39861318777567445
+   },
+   "tag": "cand16"
+  },
+  "depends_on": [
+   "hpo__cbramod_twophase__shard0",
+   "hpo__cbramod_twophase__shard1"
+  ],
+  "est_min": 0.0,
+  "job_id": "cbramod_twophase_pre__split_fm__f0__s2__emo9__cand16"
+ },
+ {
+  "kind": "train",
+  "config": "cbramod_twophase_pre",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 3407,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "hpo_params": {
+    "head": "flat_official",
+    "lp_epochs": 3,
+    "ft_epochs": 50,
+    "lr_head_lp": 0.00018354522997057995,
+    "lr_backbone_ft": 4.099547999013573e-05,
+    "lr_head_ft": 0.0006575220340623417,
+    "warmup_frac": 0.05,
+    "label_smoothing": 0.1,
+    "dropout": 0.21200292857846192
+   },
+   "tag": "cand19"
+  },
+  "depends_on": [
+   "hpo__cbramod_twophase__shard0",
+   "hpo__cbramod_twophase__shard1"
+  ],
+  "est_min": 0.0,
+  "job_id": "cbramod_twophase_pre__split_fm__f0__s3407__emo9__cand19"
+ },
+ {
+  "kind": "train",
+  "config": "cbramod_twophase_pre",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 1,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "hpo_params": {
+    "head": "flat_official",
+    "lp_epochs": 3,
+    "ft_epochs": 50,
+    "lr_head_lp": 0.00018354522997057995,
+    "lr_backbone_ft": 4.099547999013573e-05,
+    "lr_head_ft": 0.0006575220340623417,
+    "warmup_frac": 0.05,
+    "label_smoothing": 0.1,
+    "dropout": 0.21200292857846192
+   },
+   "tag": "cand19"
+  },
+  "depends_on": [
+   "hpo__cbramod_twophase__shard0",
+   "hpo__cbramod_twophase__shard1"
+  ],
+  "est_min": 0.0,
+  "job_id": "cbramod_twophase_pre__split_fm__f0__s1__emo9__cand19"
+ },
+ {
+  "kind": "train",
+  "config": "cbramod_twophase_pre",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 2,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "hpo_params": {
+    "head": "flat_official",
+    "lp_epochs": 3,
+    "ft_epochs": 50,
+    "lr_head_lp": 0.00018354522997057995,
+    "lr_backbone_ft": 4.099547999013573e-05,
+    "lr_head_ft": 0.0006575220340623417,
+    "warmup_frac": 0.05,
+    "label_smoothing": 0.1,
+    "dropout": 0.21200292857846192
+   },
+   "tag": "cand19"
+  },
+  "depends_on": [
+   "hpo__cbramod_twophase__shard0",
+   "hpo__cbramod_twophase__shard1"
+  ],
+  "est_min": 0.0,
+  "job_id": "cbramod_twophase_pre__split_fm__f0__s2__emo9__cand19"
+ },
+ {
+  "kind": "select",
+  "config": "cbramod_twophase",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 0,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "candidates": {
+    "cand27": {
+     "trial": 27,
+     "value": 0.6067901234567901,
+     "params": {
+      "head": "flat_official",
+      "lp_epochs": 3,
+      "ft_epochs": 50,
+      "lr_head_lp": 0.002322504041186585,
+      "lr_backbone_ft": 9.846858230769367e-05,
+      "lr_head_ft": 0.0005344318145710877,
+      "warmup_frac": 0.05,
+      "label_smoothing": 0.1,
+      "dropout": 0.3222104032339131
+     },
+     "lp_curve": [
+      0.111,
+      0.111,
+      0.111,
+      0.127
+     ]
+    },
+    "cand21": {
+     "trial": 21,
+     "value": 0.5535493827160494,
+     "params": {
+      "head": "flat_official",
+      "lp_epochs": 3,
+      "ft_epochs": 50,
+      "lr_head_lp": 0.0009335728137150592,
+      "lr_backbone_ft": 6.487080536900984e-05,
+      "lr_head_ft": 0.0009328763170970731,
+      "warmup_frac": 0.05,
+      "label_smoothing": 0.1,
+      "dropout": 0.11238872478693124
+     },
+     "lp_curve": [
+      0.271,
+      0.406,
+      0.429,
+      0.359
+     ]
+    },
+    "cand16": {
+     "trial": 16,
+     "value": 0.54320987654321,
+     "params": {
+      "head": "flat_official",
+      "lp_epochs": 3,
+      "ft_epochs": 50,
+      "lr_head_lp": 0.0006019613842280753,
+      "lr_backbone_ft": 7.33510935567048e-05,
+      "lr_head_ft": 0.0006079959274215075,
+      "warmup_frac": 0.05,
+      "label_smoothing": 0.1,
+      "dropout": 0.39861318777567445
+     },
+     "lp_curve": [
+      0.232,
+      0.375,
+      0.403,
+      0.339
+     ]
+    },
+    "cand19": {
+     "trial": 19,
+     "value": 0.5382716049382716,
+     "params": {
+      "head": "flat_official",
+      "lp_epochs": 3,
+      "ft_epochs": 50,
+      "lr_head_lp": 0.00018354522997057995,
+      "lr_backbone_ft": 4.099547999013573e-05,
+      "lr_head_ft": 0.0006575220340623417,
+      "warmup_frac": 0.05,
+      "label_smoothing": 0.1,
+      "dropout": 0.21200292857846192
+     },
+     "lp_curve": [
+      0.333,
+      0.402,
+      0.419,
+      0.404
+     ]
+    }
+   },
+   "seeds": [
+    3407,
+    1,
+    2
+   ]
+  },
+  "depends_on": [
+   "cbramod_twophase_pre__split_fm__f0__s3407__emo9__cand27",
+   "cbramod_twophase_pre__split_fm__f0__s1__emo9__cand27",
+   "cbramod_twophase_pre__split_fm__f0__s2__emo9__cand27",
+   "cbramod_twophase_pre__split_fm__f0__s3407__emo9__cand21",
+   "cbramod_twophase_pre__split_fm__f0__s1__emo9__cand21",
+   "cbramod_twophase_pre__split_fm__f0__s2__emo9__cand21",
+   "cbramod_twophase_pre__split_fm__f0__s3407__emo9__cand16",
+   "cbramod_twophase_pre__split_fm__f0__s1__emo9__cand16",
+   "cbramod_twophase_pre__split_fm__f0__s2__emo9__cand16",
+   "cbramod_twophase_pre__split_fm__f0__s3407__emo9__cand19",
+   "cbramod_twophase_pre__split_fm__f0__s1__emo9__cand19",
+   "cbramod_twophase_pre__split_fm__f0__s2__emo9__cand19"
+  ],
+  "est_min": 0.0,
+  "job_id": "select__cbramod_twophase"
+ },
+ {
+  "kind": "train",
+  "config": "cbramod_twophase_pre",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 3407,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "sanity_min_val": 0.2
+  },
+  "depends_on": [
+   "select__cbramod_twophase"
   ],
   "est_min": 0.0,
   "job_id": "cbramod_twophase_pre__split_fm__f0__s3407__emo9__base"

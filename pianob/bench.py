@@ -106,7 +106,7 @@ def estimate_job(job: Job, bench: dict, empirical: dict | None = None) -> float:
             return 1.2 * e
     if job.kind == "train" and job.est_min:       # stima a priori data nella coda (Sessione 02: REVE)
         return float(job.est_min)
-    if job.kind == "report":
+    if job.kind in ("report", "select"):
         return 1.0
     if job.overrides.get("max_subjects"):
         return 2.0

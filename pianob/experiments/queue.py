@@ -62,6 +62,8 @@ class Job:
             return f"hpo__{self.config}__shard{self.shard}"
         if self.kind == "report":
             return f"report__{self.config}"
+        if self.kind == "select":
+            return f"select__{self.config}"
         return f"{self.config}__{self.protocol}__f{self.fold}__s{self.seed}__{self.task}__{self.variant}"
 
     def to_dict(self):
@@ -99,6 +101,18 @@ INVALIDATED = {
              "reason": "riscalatura dopo EA/z-score dominata dagli artefatti: training bloccato al caso"}
        for jid in ['cbramod_lora_r2_ea__split_fm__f0__s0__emo9__base', 'cbramod_lora_r2_ea__split_fm__f0__s1__emo9__base', 'cbramod_lora_r2_ea__split_fm__f0__s2__emo9__base', 'cbramod_lora_r2_ea__split_fm_lco__f0__s0__emo9__base', 'cbramod_lora_r2_ea__split_fm_lco__f0__s1__emo9__base', 'cbramod_lora_r2_ea__split_fm_lco__f0__s2__emo9__base', 'cbramod_lora_r2_ea__split_fm_lco__f1__s0__emo9__base', 'cbramod_lora_r2_ea__split_fm_lco__f1__s1__emo9__base', 'cbramod_lora_r2_ea__split_fm_lco__f1__s2__emo9__base', 'cbramod_lora_r2_ea__split_fm_lco__f2__s0__emo9__base', 'cbramod_lora_r2_ea__split_fm_lco__f2__s1__emo9__base', 'cbramod_lora_r2_ea__split_fm_lco__f2__s2__emo9__base', 'cbramod_lora_r2_zsub__split_fm__f0__s0__emo9__base', 'cbramod_lora_r2_zsub__split_fm__f0__s1__emo9__base', 'cbramod_lora_r2_zsub__split_fm__f0__s2__emo9__base']},
 }
+
+
+# Notebook F (2026-11-26): la configurazione scelta da Optuna (trial 27, un solo seed) collassa a una classe
+# costante in 4/9 job a due fasi pre-addestrati sul leave-clip-out, 1/3 su split FM, 2/6 permutati e 12/12 da
+# zero (BA di validation = 1/9 dalla fase LP in poi). Si ripetono tutti con la configurazione riselezionata
+# su 3 seed (coda F, job `select__cbramod_twophase`).
+INVALIDATED.update({
+    jid: {"cutoff": 1795780015, "reason": "ricetta a due fasi del trial 27: collasso a classe costante; ripetuto "
+                                         "con la configurazione riselezionata su 3 seed"}
+    for jid in [f"cbramod_twophase_{v}__{p}__f{f}__s{s}__emo9__base" for v in ("pre", "scratch")
+                for p, folds in (("split_fm", [0]), ("split_fm_lco", [0, 1, 2])) for f in folds for s in (3407, 1, 2)]
+    + [f"cbramod_twophase_pre__split_fm_lco__f{f}__s3407__emo9__perm{k}" for f in range(3) for k in range(2)]})
 
 
 def is_invalid_record(job_id: str, t) -> bool:
@@ -394,8 +408,19 @@ def queue_F() -> list[Job]:
     from ..hpo.search_spaces import N_TRIALS
     J = hpo_jobs("cbramod_twophase", N_TRIALS["cbramod_twophase"])
     hpo_ids = [j.job_id for j in J]
+    # Riselezione su più seed: i 4 migliori trial di Optuna (tutti con testa appiattita), 3 seed ciascuno su
+    # split FM; vince la media della BA di validation. Il trial 27 da solo collassava in metà dei seed.
+    top = _hpo_best_full("cbramod_twophase").get("top", [])
+    cands = {f"cand{c['trial']}": c for c in top}
+    cjobs = [Job("train", "cbramod_twophase_pre", "split_fm", 0, s,
+                 overrides={"hpo_params": c["params"], "tag": tag}, depends_on=hpo_ids)
+             for tag, c in cands.items() for s in CBRAMOD_SEEDS3]
+    J += cjobs
+    sel = Job("select", "cbramod_twophase", overrides={"candidates": cands, "seeds": CBRAMOD_SEEDS3},
+              depends_on=[j.job_id for j in cjobs] or hpo_ids)
+    J.append(sel)
     sanity = Job("train", "cbramod_twophase_pre", "split_fm", 0, 3407, overrides={"sanity_min_val": 0.20},
-                 depends_on=hpo_ids)
+                 depends_on=[sel.job_id])
     J.append(sanity)
     dep = [sanity.job_id]
     J += train_jobs("cbramod_twophase_pre", ["split_fm"], [1, 2], depends_on=dep)
@@ -423,6 +448,11 @@ def queue_F_bis() -> list[Job]:
     for c in cfgs:
         J += train_jobs(c, ["split_fm_lco"], CBRAMOD_SEEDS3)
     return J
+
+
+def _hpo_best_full(study: str) -> dict:
+    p = Path(__file__).resolve().parents[1] / "hpo" / "best" / f"{study}.json"
+    return json.loads(p.read_text()) if p.exists() else {}
 
 
 def _hpo_best_params(study: str) -> dict:

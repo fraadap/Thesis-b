@@ -32,6 +32,8 @@ def _needs_gpu(job) -> bool:
         return False
     if job.kind == "hpo":
         return True
+    if job.kind != "train":
+        return False
     from .experiments.registry import get_config
     return get_config(job.config).family == "neural"
 

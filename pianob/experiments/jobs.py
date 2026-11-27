@@ -172,12 +172,43 @@ def run_job(job: Job, ctx: Context) -> str:
     if job.kind == "hpo":
         from ..hpo.optuna_runner import run_hpo_job
         return run_hpo_job(job, ctx)
-    cfg, hp_source = resolve_config(job.config)
+    if job.kind == "select":
+        return run_select(job, ctx)
+    cfg, hp_source = resolve_config(job.config, params=job.overrides.get("hpo_params"))
     if cfg.family == "const":
         return run_const(job, ctx, cfg)
     if cfg.family == "features":
         return run_features(job, ctx, cfg)
     return run_neural(job, ctx, cfg, hp_source)
+
+
+def run_select(job: Job, ctx: Context) -> str:
+    """Riselezione su più seed (Sessione 02, dopo i collassi del notebook F): per ogni candidato (tag -> trial)
+    media della BA di VALIDATION sui seed; vince la media più alta (un collasso conta come 1/K). Scrive il
+    migliore in hpo_best/<studio>.json nello stato, da cui i job successivi leggono gli iperparametri."""
+    from ..report import load_jobs
+    cands = job.overrides["candidates"]                      # tag -> {"trial", "value", "params"}
+    seeds = set(job.overrides["seeds"])
+    recs = [j for j in load_jobs() if j["job_id"].split("__")[-1] in cands]
+    scores = {}
+    for tag in cands:
+        v = {int(j["job_id"].split("__")[3][1:]): j["val_best"] for j in recs if j["job_id"].endswith("__" + tag)}
+        if set(v) != seeds:
+            raise RuntimeError(f"riselezione: mancano i seed {sorted(seeds - set(v))} del candidato {tag}")
+        scores[tag] = {"mean_val": float(np.mean(list(v.values()))), "per_seed": v}
+    win = max(scores, key=lambda t: scores[t]["mean_val"])
+    path = kaggle_env.state_dir() / "hpo_best" / f"{job.config}.json"
+    from ..experiments.registry import find_hpo_best
+    src = find_hpo_best(job.config)
+    best = json.loads(src.read_text()) if src else {"study": job.config}
+    best.setdefault("optuna_best", {"params": best.get("params"), "value": best.get("value"), "trial": best.get("trial")})
+    best.update(params=cands[win]["params"], trial=cands[win]["trial"], value=scores[win]["mean_val"],
+                selection={"rule": "media della BA di validation su seed " + str(sorted(seeds)), "scores": scores,
+                           "winner": win})
+    kaggle_env.write_json(path, best)
+    ctx.log(f"  riselezione {job.config}: " + ", ".join(f"{t} {s['mean_val']:.3f}" for t, s in scores.items())
+            + f" -> {win}")
+    return "completed"
 
 
 def _write(job, ctx, rows, record):

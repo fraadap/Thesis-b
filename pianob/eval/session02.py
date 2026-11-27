@@ -107,6 +107,15 @@ def ablation_a4_decision(df) -> dict:
             "NON lanciare F_bis: risultato robusto alla ricetta (al caso anche con LP-FT)"}
 
 
+def collapsed_runs(jobs, tol: float = 0.01) -> dict:
+    """Job emo9 la cui BA di validation migliore non supera il caso (1/9 + tol): modello a classe costante."""
+    out = {}
+    for j in jobs or []:
+        if "__emo9__" in j["job_id"] and "val_best" in j and j["val_best"] <= CHANCE9 + tol:
+            out.setdefault(j.get("config", j["job_id"].split("__")[0]), []).append(j["job_id"])
+    return out
+
+
 def model_summary(df, configs) -> list[dict]:
     """Tabella di riepilogo: split_fm, T_k, viste, non viste (p contro il caso), memorizzazione."""
     rows = []
@@ -174,6 +183,10 @@ def markdown(df, jobs, gate_r: dict | None = None, timing: dict | None = None) -
     md = ["\n## Sessione 02\n"]
     if gate_r:
         md.append(f"**Gate R (REVE)**: {gate_r}\n")
+    coll = collapsed_runs(jobs)
+    if coll:
+        md.append("**Job collassati** (BA di validation al caso: classe costante; da ripetere o escludere): "
+                  + "; ".join(f"{c}: {len(v)}" for c, v in sorted(coll.items())) + "\n")
     md.append("### Seconda famiglia di analisi (Holm su 4, aggiunta successiva)\n")
     for k, v in second_family(df, jobs).items():
         md.append(f"- **{k}**: {fmt(v)}" + (f" — {v['coppia']}" if "coppia" in v else ""))
