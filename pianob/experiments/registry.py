@@ -25,7 +25,7 @@ _TWOPHASE = {"lp_epochs": 5, "ft_epochs": 20, "lr_head_lp": 1e-3, "lr_backbone_f
 # REVE, ricetta ufficiale (dt.py + faced.yaml, commit 06a7059a; Appendice R §R6). Varianti A di §R8:
 # dropout 0.0, GradScaler spento, niente LoRA.
 _REVE_OFFICIAL = {"training_mode": "lp+ft", "lp_epochs": 20, "ft_epochs": 200, "lp_warmup_epochs": 3,
-                  "ft_warmup_epochs": 5, "lr_lp": 5e-3, "lr_ft": 1e-4, "batch_size": 64, "patience": 10,
+                  "ft_warmup_epochs": 5, "lr_lp": 5e-3, "lr_ft": 1e-4, "batch_size": 64, "micro_batch": 32, "patience": 10,
                   "plateau_patience": 6, "plateau_factor": 0.5, "mixup": True, "clip_grad": 2.0,
                   "weight_decay": 0.01, "betas": (0.92, 0.999), "eps": 1e-9, "dropout_lp": 0.0,
                   "dropout_ft": 0.0, "grad_scaler": False, "input_scale": 0.001,

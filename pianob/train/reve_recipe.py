@@ -7,6 +7,10 @@
   patience 6) con `step(val_acc)` una volta per epoca solo per epoch > warmup_epochs.
 - Mixup: un solo lambda ~ U(0, 1) per batch (random.random()) e una sola permutazione;
   loss = lambda * CE(y) + (1 - lambda) * CE(y[perm]). Cross-entropy senza pesi né label smoothing.
+- Batch 64 diviso in micro-batch (`micro_batch`, default 32) con accumulo del gradiente: su T4 (14.5 GB) il
+  fine-tuning completo con batch 64 esaurisce la memoria (notebook G, 2026-11-27). Il mixup si calcola sul batch
+  intero (un lambda, una permutazione) e la loss di ogni micro-batch è pesata per la sua frazione del batch:
+  stesso gradiente del batch intero (il modello non ha BatchNorm e il dropout è 0).
 - Gradient clipping a norma 2.0 su tutti i parametri; autocast fp16; GradScaler spento (variante A,
   fedele al codice: la chiave torch_dtype era letta al livello sbagliato) o acceso (variante B).
 - Selezione ed early stopping sulla BA di validation pooled (balanced_accuracy_score su tutte le finestre):
@@ -47,6 +51,7 @@ def train_reve_official(model: nn.Module, hp: dict, train_bank, val_bank, n_clas
     model.to(device)
     use_amp = device.type == "cuda"
     bs = int(hp["batch_size"])
+    micro = int(hp.get("micro_batch") or bs)
     steps = math.ceil(train_bank.n / bs)
     crit = nn.CrossEntropyLoss()
     select = hp.get("select_metric", "ba_pooled")
@@ -112,16 +117,23 @@ def train_reve_official(model: nn.Module, hp: dict, train_bank, val_bank, n_clas
             for i in range(0, len(perm), bs):
                 x, y = train_bank.get(perm[i:i + bs], device)
                 opt.zero_grad(set_to_none=True)
-                with torch.autocast("cuda", dtype=torch.float16, enabled=use_amp):
-                    if hp.get("mixup", True):
-                        mm = random.random()
-                        pm = torch.randperm(x.shape[0], device=x.device)
-                        out = model(mm * x + (1 - mm) * x[pm])
-                        loss = mm * crit(out.float(), y) + (1 - mm) * crit(out.float(), y[pm])
-                    else:
-                        out = model(x)
-                        loss = crit(out.float(), y)
-                scaler.scale(loss).backward()
+                if hp.get("mixup", True):
+                    mm = random.random()
+                    pm = torch.randperm(x.shape[0], device=x.device)
+                    x, y_b = mm * x + (1 - mm) * x[pm], y[pm]
+                else:
+                    mm, y_b = 1.0, y
+                n, loss_sum = x.shape[0], 0.0
+                for c in range(0, n, micro):
+                    xc, ya, yb = x[c:c + micro], y[c:c + micro], y_b[c:c + micro]
+                    with torch.autocast("cuda", dtype=torch.float16, enabled=use_amp):
+                        out = model(xc).float()
+                        lc = mm * crit(out, ya) + (1 - mm) * crit(out, yb) if mm != 1.0 else crit(out, ya)
+                    lc = lc * (xc.shape[0] / n)
+                    scaler.scale(lc).backward()
+                    loss_sum += float(lc.detach())
+                    del out, lc
+                loss = torch.tensor(loss_sum)
                 scaler.unscale_(opt)
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=float(hp["clip_grad"]))
                 scale = scaler.get_scale()

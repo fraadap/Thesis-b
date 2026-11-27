@@ -38,7 +38,14 @@ from pianob.report import (attach_job_times, gate1, latest_valid_jobs, main_view
 
 
 def _rows_from_lines(lines):
-    return [json.loads(l) for l in lines if l.strip()]
+    out = []
+    for l in lines:
+        if l.strip():
+            try:
+                out.append(json.loads(l))
+            except json.JSONDecodeError:   # riga troncata (disco pieno a metà scrittura)
+                pass
+    return out
 
 
 def _compact_to_rows(cj: dict) -> list[dict]:

@@ -146,6 +146,9 @@ def result_rows(job: Job, config_name: str, ev: dict, cond: str, variant: str, e
 
 def append_jsonl(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists() and path.stat().st_size and not path.read_bytes().endswith(b"\n"):
+        with open(path, "a") as fh:      # ultima riga troncata: non incollarci sopra il record nuovo
+            fh.write("\n")
     with open(path, "a") as fh:
         for r in rows:
             fh.write(json.dumps(r, default=_json_default) + "\n")

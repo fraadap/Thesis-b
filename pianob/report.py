@@ -18,9 +18,7 @@ def load_rows(paths=None) -> pd.DataFrame:
     paths = paths or sorted((kaggle_env.state_dir() / "results").glob("rows_*.jsonl"))
     recs = []
     for p in paths:
-        for line in Path(p).read_text().splitlines():
-            if line.strip():
-                recs.append(json.loads(line))
+        recs += kaggle_env.read_jsonl(p)
     recs += _tk_rows_from_state(recs)
     df = pd.DataFrame(recs)
     if not df.empty:
@@ -74,7 +72,7 @@ def latest_valid_jobs(jobs: list[dict]) -> list[dict]:
 
 
 def _read_jsonl(p) -> list[dict]:
-    return [json.loads(l) for l in Path(p).read_text().splitlines() if l.strip()] if Path(p).exists() else []
+    return kaggle_env.read_jsonl(p)
 
 
 def load_jobs(paths=None) -> list[dict]:
@@ -153,7 +151,7 @@ def gate_r(jobs: list[dict]) -> dict:
     """Gate R (Sessione 02): REVE-Base su split_fm, BA pooled per segmento all'epoca con la migliore BA di
     validation della fase FT (R2/R3); R1 = solo linear probing, da confrontare con 0.422 +- 0.028."""
     def vals(cfg):
-        return {j["job_id"].split("__s")[1].split("__")[0]: j["pooled_all"]["ba_win"] for j in jobs
+        return {j["job_id"].split("__")[3][1:]: j["pooled_all"]["ba_win"] for j in jobs   # "...__f0__s42__..."
                 if j.get("config") == cfg and "__split_fm__" in j["job_id"] and j["job_id"].endswith("__emo9__base")
                 and "pooled_all" in j}
     r1, r2 = vals("reve_base_lp"), vals("reve_base")

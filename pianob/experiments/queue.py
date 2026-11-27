@@ -140,14 +140,12 @@ def invalid_row_mask(df):
 def done_status() -> dict[str, dict]:
     out = {}
     for f in (kaggle_env.state_dir() / "done").glob("*.jsonl"):
-        for line in f.read_text().splitlines():
-            if line.strip():
-                r = json.loads(line)
-                if is_invalid_record(r["job_id"], r.get("t")):
-                    continue
-                prev = out.get(r["job_id"])
-                if prev is None or prev["status"] not in DONE_STATUSES:
-                    out[r["job_id"]] = r
+        for r in kaggle_env.read_jsonl(f):
+            if is_invalid_record(r["job_id"], r.get("t")):
+                continue
+            prev = out.get(r["job_id"])
+            if prev is None or prev["status"] not in DONE_STATUSES:
+                out[r["job_id"]] = r
     return out
 
 

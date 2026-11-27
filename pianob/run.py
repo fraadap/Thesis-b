@@ -108,8 +108,11 @@ def worker_loop(queue_path: str, worker: str, synthetic: bool, device: str) -> N
                 status = "failed"
                 failed.add(j.job_id)
                 log(f"ERRORE {j.job_id}: {e!r}\n{traceback.format_exc()}")
-                for tmp in (kaggle_env.state_dir() / "ckpt").glob(f"{j.job_id}*.tmp"):
-                    tmp.unlink(missing_ok=True)              # checkpoint parziale (es. disco pieno)
+                for ck in (kaggle_env.state_dir() / "ckpt").glob(f"{j.job_id}.pt*"):
+                    ck.unlink(missing_ok=True)   # checkpoint del job fallito (~1.1 GB per REVE): libera il disco
+                if "out of memory" in repr(e).lower():
+                    import torch
+                    torch.cuda.empty_cache()
                 mark(j, "failed", worker, (time.time() - t0) / 60, {"error": repr(e)[:500]})
             else:
                 mark(j, status, worker, (time.time() - t0) / 60)
@@ -170,11 +173,13 @@ def main(argv=None):
     if len(gpus) <= 1:
         if gpus:
             os.environ["CUDA_VISIBLE_DEVICES"] = str(gpus[0])
+            os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
         worker_loop(a.queue, "w0", synthetic, "cuda" if gpus else "cpu")
         return
     procs = []
     for g in gpus:
         env = dict(os.environ, CUDA_VISIBLE_DEVICES=str(g))
+        env.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
         cmd = [sys.executable, "-u", "-m", "pianob.run", "--queue", a.queue, "--worker", f"w{g}"]
         if synthetic:
             cmd.append("--synthetic")

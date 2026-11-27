@@ -48,5 +48,9 @@ def preflight(adapter, device="cpu", log=print, require_weights: bool = True) ->
     model.set_phase("ft")
     out.update(encoder_out=tuple(tok.shape), head_in=model.out_shape, lp_trainable=n_lp,
                ft_trainable=sum(p.numel() for p in model.parameters() if p.requires_grad))
+    model.to("cpu")
+    del model, tok, logits
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     log(f"[REVE] controlli §R10 superati: {out}")
     return out

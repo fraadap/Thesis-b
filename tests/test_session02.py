@@ -190,3 +190,44 @@ def test_queues_session02():
     assert [j.config for j in G[:2]] == ["reve_base_lp", "reve_base"]
     assert sum(1 for j in G if j.config == "reve_base" and j.protocol == "split_fm_lco" and j.perm is None
                and j.task == "emo9") == 9
+
+
+def test_reve_micro_batch_same_gradient_as_full_batch():
+    """Accumulo su micro-batch (OOM su T4): stessi pesi finali del batch intero, mixup compreso."""
+    import copy
+    import numpy as np
+    import torch
+    from pianob.train.loop import TrialBank
+    from pianob.train.reve_recipe import train_reve_official
+    from pianob.experiments.registry import _REVE_OFFICIAL
+
+    class Tiny(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.f = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(4 * 40, 16), torch.nn.GELU(),
+                                         torch.nn.Linear(16, 3))
+
+        def set_phase(self, phase):
+            pass
+
+        def set_dropout(self, p):
+            pass
+
+        def forward(self, x, subj=None):
+            return self.f(x)
+
+    rng = np.random.default_rng(0)
+    data = rng.normal(size=(12, 4, 120)).astype(np.float32)
+    subj, clip, lab = np.repeat(np.arange(4), 3), np.tile(np.arange(3), 4), np.tile(np.arange(3), 4)
+    tr = TrialBank(data, subj, clip, lab, 40)
+    va = TrialBank(data[:6], subj[:6], clip[:6], lab[:6], 40)
+    hp = {**_REVE_OFFICIAL, "training_mode": "ft", "ft_epochs": 2, "ft_warmup_epochs": 1, "batch_size": 16}
+    torch.manual_seed(0)
+    m0 = Tiny()
+    outs = []
+    for micro in (16, 4):
+        m = copy.deepcopy(m0)
+        torch.manual_seed(5)        # permutazione del mixup (nella pipeline il seed è fissato dal job)
+        train_reve_official(m, {**hp, "micro_batch": micro}, tr, va, 3, "cpu", seed=1, log=lambda *a: None)
+        outs.append(torch.cat([p.detach().flatten() for p in m.parameters()]))
+    assert torch.allclose(outs[0], outs[1], atol=1e-5), (outs[0] - outs[1]).abs().max()

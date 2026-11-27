@@ -110,6 +110,21 @@ def disk_status() -> dict:
             "ok": free >= MIN_FREE_GB and used <= WORKING_QUOTA_GB - MIN_FREE_GB}
 
 
+def read_jsonl(path) -> list[dict]:
+    """Righe JSON valide di un file .jsonl; scarta quelle troncate (es. disco pieno durante la scrittura)."""
+    out = []
+    p = Path(path)
+    if not p.exists():
+        return out
+    for line in p.read_text().splitlines():
+        if line.strip():
+            try:
+                out.append(json.loads(line))
+            except json.JSONDecodeError:
+                print(f"[attenzione] riga troncata ignorata in {p.name}: {line[:80]}...")
+    return out
+
+
 def restore_state_from_inputs(verbose: bool = True) -> dict:
     """Copia nello stato corrente risultati, done, checkpoint, .db Optuna ecc. trovati negli
     output di sessioni precedenti collegati come input. Non sovrascrive file più recenti."""
