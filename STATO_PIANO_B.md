@@ -1,6 +1,6 @@
 # Stato del Piano B
 
-Ultimo aggiornamento: 2026-11-26 (notebook D quasi completo; Sessione 02 pronta: ricetta a due fasi di CBraMod, pretraining su clip non viste, REVE-Base)
+Ultimo aggiornamento: 2026-11-27 (notebook D completo; notebook F e G rilanciati dopo le correzioni: riselezione della ricetta a due fasi, memoria e disco per REVE)
 
 ## Obiettivo
 
@@ -17,12 +17,14 @@ Contributo atteso:
 ## Passo corrente
 
 **Sessione 02 in corso** (dettagli nella sezione "Sessione 02" più sotto).
-Prossime azioni dell'utente:
-1. ricostruire lo zip del codice;
-2. notebook F: rilanciarlo con in input l'output della prima sessione (`results_nbF_ricetta_pretraining`).
-   Partono solo i 43 job della riselezione e della Parte A ripetuta (circa 6 ore con 2 worker);
-3. notebook G (coda `G`) su un account dedicato, dopo aver creato il Secret `HF_TOKEN` e attivato Internet
-   (README_KAGGLE.md, sezione C2);
+In esecuzione (codice `8b3cd8e`):
+1. notebook F, seconda sessione (account S edge 2), con in input `results_nbF_ricetta_pretraining`: 12 candidati, riselezione
+   (`select__cbramod_twophase`), controllo di sanità e Parte A ripetuta, 43 job, circa 6 ore;
+2. notebook G, ripresa (account Z edge 3), con in input il `pianob_state` scaricato dalla prima sessione (7 job validi; i 34
+   falliti ripartono). Serve il Secret `HF_TOKEN` attivo sul notebook: la copia su questo account era anteriore a `a359f63`,
+   quindi senza Secret si ferma. In alternativa si reimporta `notebooks/nbG_reve.ipynb`. Per la coda G servono ancora
+   circa 2–3 sessioni;
+3. dopo F: regola A.4 (F_bis sì o no) e seconda famiglia con i job a due fasi validi; dopo le prime ore di G: Gate R2 (5 seed);
 4. notebook D: ✅ completato il 2026-11-27 (360/360).
 
 ## Sessione 02 (2026-11-25): ricetta a due fasi, pretraining su clip non viste, REVE-Base
