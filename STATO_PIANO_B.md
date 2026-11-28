@@ -21,14 +21,14 @@ Sessione 03 pronta (notebook H e I, sezione C3 di README_KAGGLE): prima aggiunge
 Dataset dei dati e ricostruire lo zip del codice.
 
 In esecuzione (codice `8b3cd8e`):
-1. notebook F, seconda sessione (account S edge 2), con in input `results_nbF_ricetta_pretraining`: 12 candidati, riselezione
-   (`select__cbramod_twophase`), controllo di sanità e Parte A ripetuta, 43 job, circa 6 ore;
+1. notebook F: ✅ completato il 2026-11-28 (63/63, nessun errore). Riselezione su 3 seed: vince il trial 21
+   (validation 0.559 di media; il trial 27 collassa sul seed 1). **Regola A.4: F_bis NON si lancia**;
 2. notebook G, terza sessione: **ricostruire lo zip del codice** (diagnosi del Gate R2 in testa alla coda) e collegare
    come input l'output della seconda sessione. Prima girano 6 job di diagnosi (dropout dello YAML e GradScaler,
    seed 42–44 su split_fm, circa 3 ore con 2 GPU) e la scelta `select__reve_recipe`; nel frattempo i worker
    eseguono i job CBraMod della coda. Se vince una variante, i job REVE già fatti si ripetono con quella;
    altrimenti si prosegue con la ricetta di base dichiarando lo scostamento;
-3. dopo F: regola A.4 (F_bis sì o no) e seconda famiglia con i job a due fasi validi; dopo le prime ore di G: Gate R2 (5 seed);
+3. Gate R2: ✅ misurato (0.4225, non passato) → diagnosi nella coda G; S4 (bande) dopo i job sulle bande di G;
 4. notebook D: ✅ completato il 2026-11-27 (360/360).
 
 ## Sessione 03 (2026-11-27): label da self-report, componente della clip e componente individuale
@@ -342,6 +342,7 @@ soggetto sui 23 soggetti di test di split FM (caso: 0.111 a 9 classi, 0.5 binari
 | 22 | 26–27/11 | Z edge 3 / F | 50/50 | Optuna a due fasi: vince la testa appiattita (trial 27, 0.607), ma **collassa a classe costante** in 19 job su 33 a due fasi (tutti i 12 da zero). Riselezione su 3 seed in coda. Parte B: pretraining sulle clip nuove −1.2 (p 0.065; S1 p Holm 0.13); da zero con warm-up 0.123 sulle clip nuove. |
 | 23 | 26–27/11 | S edge 2 / G | 7/41 validi | **Memoria GPU esaurita nel fine-tuning di REVE** con batch 64 su T4 (14.5 GB): 29 job falliti all'inizio della fase FT. Ognuno lasciava un checkpoint da circa 1.1 GB e alla fine il disco di /kaggle/working si è riempito (5 job falliti in scrittura, una riga di `done` troncata, notebook senza output). Correzioni: batch 64 diviso in micro-batch da 32 con accumulo del gradiente (stessi pesi del batch intero, verificato da un test), checkpoint dei job falliti cancellati, allocatore CUDA `expandable_segments`, il controllo preliminare libera la GPU, nessun modello REVE salvato, guardia sullo spazio libero, file jsonl tolleranti a righe troncate; corretto anche il seed letto dal Gate R. Validi: R1 (solo LP, seed 42) 0.370 per finestra (0.439 per trial; obiettivo 0.422 ± 0.028, entro 2σ), 6 job REVE. Prime clip nuove (2 fold, 1 seed): 0.135. |
 | 24 | 27–28/11 | Z edge 3 / G (ripresa) | circa 22, nessun errore | Micro-batch: nessun esaurimento di memoria, circa 55 min per job REVE. **Gate R2 NON PASSATO: 0.4225 ± 0.013** su 5 seed (42: 0.431, 43: 0.412, 44: 0.413, 45: 0.415, 46: 0.442; intervallo 0.548–0.581). R1 0.370 (entro 2σ). Il fine-tuning aggiunge circa 4 punti di validation al linear probing e si ferma presto. Leave-clip-out (3 seed × 3 fold): viste 0.455, nuove 0.132 (S3 provvisorio), memorizzazione 0.33. Diagnosi (regola della Sessione 02): forma e scala dei dati, posizioni, pesi e query cls coincidono con il codice ufficiale; anche la ricetta (clipping 2.0 da `trainer.clip_grad`, il `clip: 100` dello YAML non è letto; GradScaler spento; dropout 0; testa con init di default; test all'epoca migliore in validation). Restano le varianti di §R8: dropout dello YAML e GradScaler (in fp16 senza GradScaler i gradienti piccoli del fine-tuning possono andare a zero, coerente con un FT che impara poco). Messe in testa alla coda G, scelta solo in validation (margine 0.01). |
+| 25 | 27–28/11 | S edge 2 / F (ripresa) | 43/43 | Riselezione della ricetta a due fasi su 3 seed: trial 21 0.559, 19 0.547, 16 0.544, 27 0.438 (collasso sul seed 1) → **trial 21** (testa appiattita, dropout 0.11, LR backbone 6.5e-5). Due fasi pre-addestrato: split FM 0.504, leave-clip-out viste 0.530, **nuove 0.115 (S2 +0.4, p Holm 0.185)**, memorizzazione 0.395. **Regola A.4: niente F_bis** (al caso sulle clip nuove anche con LP-FT). Due fasi da zero con gli stessi iperparametri: **collassa a classe costante in 12 job su 12**, quindi il confronto pre-addestrato contro da zero con questa ricetta non è interpretabile (avviso nell'aggregatore). Seconda famiglia: S1 pretraining sulle clip nuove −1.2 (p Holm 0.13), S2 non significativo, S3 REVE sulle nuove +2.1 (p Holm 0.005, provvisorio fino alla scelta della ricetta), S4 in attesa. Ricetta identica con warm-up: il pre-addestrato è **peggiore** del da zero sulle clip viste (−3.8, p 7e-5) e uguale sulle nuove. |
 
 **Risultati del notebook C (2026-11-24), 23 soggetti, caso 0.111:**
 - **Clip non viste (risultato centrale):**

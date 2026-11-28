@@ -69,6 +69,13 @@ def pretraining_on_unseen(df, jobs) -> dict:
             idx = sa_s.index.intersection(sb_s.index).intersection(sa_u.index).intersection(sb_u.index)
             inter = (sa_s[idx] - sb_s[idx]) - (sa_u[idx] - sb_u[idx])
             r["interazione (pre-scr)_viste - (pre-scr)_nonviste"] = paired_test(inter.values, np.zeros(len(idx)))
+        for c in (a, b):                       # confronto degenere: un lato è un predittore costante
+            base = [j["job_id"] for j in jobs or [] if j["job_id"].split("__")[0] == c
+                    and j["job_id"].endswith("__emo9__base") and "val_best" in j]
+            n_coll = sum(1 for i in base if i in set(collapsed_runs(jobs).get(c, [])))
+            if base and n_coll == len(base):
+                r["avviso"] = (f"NON interpretabile: {c} collassa a classe costante in {n_coll}/{len(base)} job "
+                               "(la differenza misura il collasso, non il pretraining)")
         if len(r) > 1:
             out[name] = r
     return out
@@ -203,7 +210,9 @@ def markdown(df, jobs, gate_r: dict | None = None, timing: dict | None = None) -
     for name, r in pretraining_on_unseen(df, jobs).items():
         md.append(f"- {name} ({r['coppia']}):")
         for k, v in r.items():
-            if k != "coppia":
+            if k == "avviso":
+                md.append(f"    - **{v}**")
+            elif k != "coppia":
                 md.append(f"    - {k}: {fmt(v)}")
     rc = reve_vs_cbramod(df)
     if rc:
