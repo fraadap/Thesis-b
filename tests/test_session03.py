@@ -179,3 +179,13 @@ def test_queues_session03():
     assert all(j.config == "de_asym_lr_zsub" and j.protocol == "lnso10_lco" and j.n_perm == 50 for j in first)
     assert all(j.overrides.get("needs_gate_r") for j in I if j.config == "reve_base")
     assert all(not j.overrides.get("needs_gate_r") for j in I if j.config != "reve_base")
+
+
+def test_faced_mat_layout_after_remark_singular():
+    """Formato reale dei .mat di FACED: variabile `After_remark`, struct 1 x 28, Accuracy vuoto in molti trial."""
+    rng = np.random.default_rng(0)
+    rem = [{"score": rng.uniform(0, 7, 12), "trial": k + 1, "vid": int(v), "Accuracy": np.array([]) if k % 5 else 0.9,
+            "ResponseTime": np.array([]) if k % 5 else rng.uniform(0, 4, 20)} for k, v in enumerate(rng.permutation(28) + 1)]
+    out = T.parse_after_remarks({"__header__": b"", "After_remark": rem})
+    assert out["score"].shape == (28, 12) and out["trial"].tolist() == list(range(1, 29))
+    assert out["extra"]["ResponseTime"].shape == (120,) and "irregolari" in out["fields"]["Accuracy"]

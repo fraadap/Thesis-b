@@ -112,7 +112,11 @@ def _ci_get(d: dict, name: str):
 def parse_after_remarks(raw: dict) -> dict:
     """Normalizza il contenuto di After_remarks in score (28, 12), trial (28,), vid (28,) e campi extra."""
     rem = _ci_get(raw, "After_remarks")
-    rem = raw if rem is None else rem
+    if rem is None:                       # nei .mat di FACED la variabile si chiama After_remark (singolare)
+        rem = _ci_get(raw, "After_remark")
+    if rem is None:
+        keys = [k for k in raw if not str(k).startswith("__")]
+        rem = raw[keys[0]] if len(keys) == 1 and not isinstance(raw[keys[0]], np.ndarray) else raw
     if isinstance(rem, list) and rem and isinstance(rem[0], dict):           # struct array 1 x 28
         fields = {k for r in rem for k in r}
         rem = {f: [r.get(f) for r in rem] for f in fields}
@@ -140,7 +144,15 @@ def parse_after_remarks(raw: dict) -> dict:
                 extra[k] = np.asarray([float(x) for x in np.ravel(np.asarray(v, dtype=object))
                                        for x in np.ravel(np.asarray(x, dtype=float))])
     return {"score": score, "trial": trial.astype(int), "vid": vid.astype(int), "extra": extra,
-            "fields": {str(k): str(np.shape(v)) + " " + type(v).__name__ for k, v in rem.items()}}
+            "fields": {str(k): _describe(v) for k, v in rem.items()}}
+
+
+def _describe(v) -> str:
+    """Forma e tipo di un campo (anche per liste irregolari, es. Accuracy vuoto in alcuni trial)."""
+    try:
+        return f"{np.shape(v)} {type(v).__name__}"
+    except ValueError:
+        return f"lista di {len(v)} elementi irregolari ({type(v).__name__})"
 
 
 def find_subject_files(roots=None) -> dict[int, Path]:
