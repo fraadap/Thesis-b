@@ -115,9 +115,54 @@ INVALIDATED.update({
     + [f"cbramod_twophase_pre__split_fm_lco__f{f}__s3407__emo9__perm{k}" for f in range(3) for k in range(2)]})
 
 
+# Sessione 02, diagnosi del Gate R2 (notebook G, 2026-11-28: R2 = 0.4225 su 5 seed, intervallo 0.548-0.581).
+# Il codice ufficiale coincide con il nostro (clipping 2.0 letto da trainer.clip_grad, GradScaler spento,
+# dropout 0, testa con init di default, scala 1/1000, test all'epoca migliore in validation); restano le
+# varianti di §R8 (dropout dello YAML, GradScaler: senza, il fine-tuning in fp16 può perdere i gradienti piccoli).
+# Si allenano su split_fm con i seed 42-44 e si sceglie SOLO in validation (job select__reve_recipe): una
+# variante sostituisce la ricetta di base se la sua BA media di validation supera quella di base di almeno
+# RECIPE_MARGIN. Se vince una variante, i job REVE completati prima della scelta valgono come invalidati e si
+# rieseguono con la variante (stesso job_id, iperparametri modificati da `recipe_patch`).
+RECIPE_STUDY = "reve_recipe"
+RECIPE_DEFAULT = "reve_base"
+RECIPE_VARIANTS = ("reve_base_yamldropout", "reve_base_gradscaler")
+RECIPE_CONFIGS = ("reve_base", "reve_base_scratch", "reve_base_lora16")
+RECIPE_KEYS = ("grad_scaler", "dropout_lp", "dropout_ft")
+RECIPE_MARGIN = 0.01
+_recipe_override: dict | None = None
+_recipe_cache: dict = {}
+
+
+def set_recipe_choice(choice: dict | None) -> None:
+    """Aggregatore: la scelta letta dagli zip (None = nessuna scelta, si usa lo stato corrente)."""
+    global _recipe_override
+    _recipe_override = choice
+
+
+def recipe_choice() -> dict | None:
+    if _recipe_override is not None:
+        return _recipe_override
+    p = kaggle_env.state_dir() / "hpo_best" / f"{RECIPE_STUDY}.json"
+    if not p.exists():
+        return None
+    key = (str(p), p.stat().st_mtime)
+    if key not in _recipe_cache:
+        _recipe_cache.clear()
+        _recipe_cache[key] = json.loads(p.read_text())
+    return _recipe_cache[key]
+
+
+def _recipe_cutoff() -> float | None:
+    ch = recipe_choice()
+    return float(ch["t"]) if ch and ch.get("winner", RECIPE_DEFAULT) != RECIPE_DEFAULT else None
+
+
 def is_invalid_record(job_id: str, t) -> bool:
     inv = INVALIDATED.get(job_id)
-    return inv is not None and (t is None or float(t) < inv["cutoff"])
+    if inv is not None and (t is None or float(t) < inv["cutoff"]):
+        return True
+    cut = _recipe_cutoff()
+    return cut is not None and job_id.split("__")[0] in RECIPE_CONFIGS and (t is None or float(t) < cut)
 
 
 def invalid_row_mask(df):
@@ -134,6 +179,10 @@ def invalid_row_mask(df):
                & ((df.variant == variant) | df.variant.astype(str).str.startswith(variant + "_bnalpha")))
         old = sel if t is None else sel & (t.isna() | (t < inv["cutoff"]))
         m |= old.values
+    cut = _recipe_cutoff()
+    if cut is not None:                                   # confronto esatto sul nome (non per prefisso)
+        sel = df.config.astype(str).isin(RECIPE_CONFIGS)
+        m |= (sel if t is None else sel & (t.isna() | (t < cut))).values
     return m
 
 
@@ -476,6 +525,15 @@ def queue_G() -> list[Job]:
     # 1. Gate R: R1 (solo LP, 1 seed) e R2 (LP+FT, 5 seed); la sonda della clip (blocco 8) sul primo seed
     J += tj("reve_base_lp", ["split_fm"], [42])
     J += [Job("train", R, "split_fm", 0, s, probe=(s == 42), est_min=45) for s in REVE_SEEDS_GATE]
+    # 1b. diagnosi del Gate R2 (fuori intervallo): varianti della ricetta sui seed 42-44, scelta in validation.
+    # Tutti i job REVE successivi aspettano la scelta (i job CBraMod in coda possono girare nel frattempo).
+    dseeds = REVE_SEEDS_GATE[:3]
+    diag = [Job("train", v, "split_fm", 0, s, est_min=55) for v in RECIPE_VARIANTS for s in dseeds]
+    cands = {c: [Job("train", c, "split_fm", 0, s).job_id for s in dseeds] for c in (R, *RECIPE_VARIANTS)}
+    sel = Job("select", RECIPE_STUDY, overrides={"candidate_jobs": cands, "default": R, "margin": RECIPE_MARGIN},
+              depends_on=[i for ids in cands.values() for i in ids])
+    J += diag + [sel]
+    n_head = len(J)
     # 2. split_fm con T_k: dai job di R2 (condizioni tk0..2 calcolate nello stesso job)
     # 3. leave-clip-out (risultato centrale)
     J += tj(R, ["split_fm_lco"], SEEDS3)
@@ -501,7 +559,8 @@ def queue_G() -> list[Job]:
     # 10-11. opzionali: REVE da zero; LoRA rango 16
     J += tj("reve_base_scratch", ["split_fm", "split_fm_lco"], SEEDS3)
     J += tj("reve_base_lora16", ["split_fm", "split_fm_lco"], SEEDS3)
-    return J
+    return J[:n_head] + [dataclasses_replace(j, depends_on=[*j.depends_on, sel.job_id])
+                         if j.config in RECIPE_CONFIGS else j for j in J[n_head:]]
 
 
 def dataclasses_replace(job: Job, **kw) -> Job:

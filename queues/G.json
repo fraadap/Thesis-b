@@ -121,6 +121,176 @@
  },
  {
   "kind": "train",
+  "config": "reve_base_yamldropout",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 42,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {},
+  "depends_on": [],
+  "est_min": 55,
+  "job_id": "reve_base_yamldropout__split_fm__f0__s42__emo9__base"
+ },
+ {
+  "kind": "train",
+  "config": "reve_base_yamldropout",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 43,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {},
+  "depends_on": [],
+  "est_min": 55,
+  "job_id": "reve_base_yamldropout__split_fm__f0__s43__emo9__base"
+ },
+ {
+  "kind": "train",
+  "config": "reve_base_yamldropout",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 44,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {},
+  "depends_on": [],
+  "est_min": 55,
+  "job_id": "reve_base_yamldropout__split_fm__f0__s44__emo9__base"
+ },
+ {
+  "kind": "train",
+  "config": "reve_base_gradscaler",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 42,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {},
+  "depends_on": [],
+  "est_min": 55,
+  "job_id": "reve_base_gradscaler__split_fm__f0__s42__emo9__base"
+ },
+ {
+  "kind": "train",
+  "config": "reve_base_gradscaler",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 43,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {},
+  "depends_on": [],
+  "est_min": 55,
+  "job_id": "reve_base_gradscaler__split_fm__f0__s43__emo9__base"
+ },
+ {
+  "kind": "train",
+  "config": "reve_base_gradscaler",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 44,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {},
+  "depends_on": [],
+  "est_min": 55,
+  "job_id": "reve_base_gradscaler__split_fm__f0__s44__emo9__base"
+ },
+ {
+  "kind": "select",
+  "config": "reve_recipe",
+  "protocol": "split_fm",
+  "fold": 0,
+  "seed": 0,
+  "task": "emo9",
+  "band": null,
+  "drop": null,
+  "perm": null,
+  "draw": null,
+  "n_trials": 0,
+  "shard": 0,
+  "probe": false,
+  "n_perm": 0,
+  "overrides": {
+   "candidate_jobs": {
+    "reve_base": [
+     "reve_base__split_fm__f0__s42__emo9__base",
+     "reve_base__split_fm__f0__s43__emo9__base",
+     "reve_base__split_fm__f0__s44__emo9__base"
+    ],
+    "reve_base_yamldropout": [
+     "reve_base_yamldropout__split_fm__f0__s42__emo9__base",
+     "reve_base_yamldropout__split_fm__f0__s43__emo9__base",
+     "reve_base_yamldropout__split_fm__f0__s44__emo9__base"
+    ],
+    "reve_base_gradscaler": [
+     "reve_base_gradscaler__split_fm__f0__s42__emo9__base",
+     "reve_base_gradscaler__split_fm__f0__s43__emo9__base",
+     "reve_base_gradscaler__split_fm__f0__s44__emo9__base"
+    ]
+   },
+   "default": "reve_base",
+   "margin": 0.01
+  },
+  "depends_on": [
+   "reve_base__split_fm__f0__s42__emo9__base",
+   "reve_base__split_fm__f0__s43__emo9__base",
+   "reve_base__split_fm__f0__s44__emo9__base",
+   "reve_base_yamldropout__split_fm__f0__s42__emo9__base",
+   "reve_base_yamldropout__split_fm__f0__s43__emo9__base",
+   "reve_base_yamldropout__split_fm__f0__s44__emo9__base",
+   "reve_base_gradscaler__split_fm__f0__s42__emo9__base",
+   "reve_base_gradscaler__split_fm__f0__s43__emo9__base",
+   "reve_base_gradscaler__split_fm__f0__s44__emo9__base"
+  ],
+  "est_min": 0.0,
+  "job_id": "select__reve_recipe"
+ },
+ {
+  "kind": "train",
   "config": "reve_base",
   "protocol": "split_fm_lco",
   "fold": 0,
@@ -135,7 +305,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f0__s0__emo9__base"
  },
@@ -155,7 +327,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f0__s1__emo9__base"
  },
@@ -175,7 +349,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f0__s2__emo9__base"
  },
@@ -195,7 +371,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f1__s0__emo9__base"
  },
@@ -215,7 +393,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f1__s1__emo9__base"
  },
@@ -235,7 +415,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f1__s2__emo9__base"
  },
@@ -255,7 +437,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f2__s0__emo9__base"
  },
@@ -275,7 +459,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f2__s1__emo9__base"
  },
@@ -295,7 +481,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f2__s2__emo9__base"
  },
@@ -315,7 +503,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f0__s0__emo9__perm0"
  },
@@ -335,7 +525,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f1__s0__emo9__perm0"
  },
@@ -355,7 +547,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f2__s0__emo9__perm0"
  },
@@ -375,7 +569,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f0__s0__emo9__perm1"
  },
@@ -395,7 +591,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f1__s0__emo9__perm1"
  },
@@ -415,7 +613,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f2__s0__emo9__perm1"
  },
@@ -435,7 +635,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_sizematched__f0__s0__emo9__draw0"
  },
@@ -455,7 +657,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_sizematched__f0__s1__emo9__draw0"
  },
@@ -475,7 +679,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_sizematched__f0__s2__emo9__draw0"
  },
@@ -495,7 +701,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_sizematched__f1__s0__emo9__draw0"
  },
@@ -515,7 +723,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_sizematched__f1__s1__emo9__draw0"
  },
@@ -535,7 +745,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_sizematched__f1__s2__emo9__draw0"
  },
@@ -555,7 +767,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_sizematched__f2__s0__emo9__draw0"
  },
@@ -575,7 +789,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_sizematched__f2__s1__emo9__draw0"
  },
@@ -595,7 +811,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_sizematched__f2__s2__emo9__draw0"
  },
@@ -615,7 +833,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_sizematched__f0__s0__emo9__draw0_perm0"
  },
@@ -635,7 +855,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_sizematched__f1__s0__emo9__draw0_perm0"
  },
@@ -655,7 +877,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_sizematched__f2__s0__emo9__draw0_perm0"
  },
@@ -675,7 +899,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_sizematched__f0__s0__emo9__draw0_perm1"
  },
@@ -695,7 +921,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_sizematched__f1__s0__emo9__draw0_perm1"
  },
@@ -715,7 +943,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_sizematched__f2__s0__emo9__draw0_perm1"
  },
@@ -738,7 +968,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s0__emo9__bp4-30"
  },
@@ -761,7 +993,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s1__emo9__bp4-30"
  },
@@ -784,7 +1018,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s2__emo9__bp4-30"
  },
@@ -807,7 +1043,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s0__emo9__bp4-47"
  },
@@ -830,7 +1068,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s1__emo9__bp4-47"
  },
@@ -853,7 +1093,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s2__emo9__bp4-47"
  },
@@ -876,7 +1118,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s0__emo9__bp0-30"
  },
@@ -899,7 +1143,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s1__emo9__bp0-30"
  },
@@ -922,7 +1168,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s2__emo9__bp0-30"
  },
@@ -942,7 +1190,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s0__emo9__noedge"
  },
@@ -962,7 +1212,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s1__emo9__noedge"
  },
@@ -982,7 +1234,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s2__emo9__noedge"
  },
@@ -1002,7 +1256,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s0__emo9__ocular4"
  },
@@ -1022,7 +1278,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s1__emo9__ocular4"
  },
@@ -1042,7 +1300,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s2__emo9__ocular4"
  },
@@ -1062,7 +1322,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s0__emo9__temporal4"
  },
@@ -1082,7 +1344,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s1__emo9__temporal4"
  },
@@ -1102,7 +1366,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s2__emo9__temporal4"
  },
@@ -1122,7 +1388,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s0__emo9__rand4d0"
  },
@@ -1142,7 +1410,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s1__emo9__rand4d1"
  },
@@ -1162,7 +1432,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s2__emo9__rand4d2"
  },
@@ -1182,7 +1454,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s0__emo9__rand8d0"
  },
@@ -1202,7 +1476,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s1__emo9__rand8d1"
  },
@@ -1222,7 +1498,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s2__emo9__rand8d2"
  },
@@ -1245,7 +1523,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s0__emo9__bp4-30_noedge"
  },
@@ -1268,7 +1548,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s1__emo9__bp4-30_noedge"
  },
@@ -1291,7 +1573,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s2__emo9__bp4-30_noedge"
  },
@@ -1314,7 +1598,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s0__emo9__bp4-30_rand8d0"
  },
@@ -1337,7 +1623,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s1__emo9__bp4-30_rand8d1"
  },
@@ -1360,7 +1648,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s2__emo9__bp4-30_rand8d2"
  },
@@ -1380,7 +1670,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s0__val2__base"
  },
@@ -1400,7 +1692,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s1__val2__base"
  },
@@ -1420,7 +1714,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s2__val2__base"
  },
@@ -1440,7 +1736,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f0__s0__val2__base"
  },
@@ -1460,7 +1758,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f0__s1__val2__base"
  },
@@ -1480,7 +1780,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f0__s2__val2__base"
  },
@@ -1500,7 +1802,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f1__s0__val2__base"
  },
@@ -1520,7 +1824,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f1__s1__val2__base"
  },
@@ -1540,7 +1846,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f1__s2__val2__base"
  },
@@ -1560,7 +1868,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f2__s0__val2__base"
  },
@@ -1580,7 +1890,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f2__s1__val2__base"
  },
@@ -1600,7 +1912,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base__split_fm_lco__f2__s2__val2__base"
  },
@@ -1860,7 +2174,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s47__emo9__base"
  },
@@ -1880,7 +2196,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s48__emo9__base"
  },
@@ -1900,7 +2218,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s49__emo9__base"
  },
@@ -1920,7 +2240,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s50__emo9__base"
  },
@@ -1940,7 +2262,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base__split_fm__f0__s51__emo9__base"
  },
@@ -1960,7 +2284,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base_scratch__split_fm__f0__s0__emo9__base"
  },
@@ -1980,7 +2306,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base_scratch__split_fm__f0__s1__emo9__base"
  },
@@ -2000,7 +2328,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base_scratch__split_fm__f0__s2__emo9__base"
  },
@@ -2020,7 +2350,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base_scratch__split_fm_lco__f0__s0__emo9__base"
  },
@@ -2040,7 +2372,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base_scratch__split_fm_lco__f0__s1__emo9__base"
  },
@@ -2060,7 +2394,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base_scratch__split_fm_lco__f0__s2__emo9__base"
  },
@@ -2080,7 +2416,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base_scratch__split_fm_lco__f1__s0__emo9__base"
  },
@@ -2100,7 +2438,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base_scratch__split_fm_lco__f1__s1__emo9__base"
  },
@@ -2120,7 +2460,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base_scratch__split_fm_lco__f1__s2__emo9__base"
  },
@@ -2140,7 +2482,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base_scratch__split_fm_lco__f2__s0__emo9__base"
  },
@@ -2160,7 +2504,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base_scratch__split_fm_lco__f2__s1__emo9__base"
  },
@@ -2180,7 +2526,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base_scratch__split_fm_lco__f2__s2__emo9__base"
  },
@@ -2200,7 +2548,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base_lora16__split_fm__f0__s0__emo9__base"
  },
@@ -2220,7 +2570,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base_lora16__split_fm__f0__s1__emo9__base"
  },
@@ -2240,7 +2592,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 45,
   "job_id": "reve_base_lora16__split_fm__f0__s2__emo9__base"
  },
@@ -2260,7 +2614,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base_lora16__split_fm_lco__f0__s0__emo9__base"
  },
@@ -2280,7 +2636,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base_lora16__split_fm_lco__f0__s1__emo9__base"
  },
@@ -2300,7 +2658,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base_lora16__split_fm_lco__f0__s2__emo9__base"
  },
@@ -2320,7 +2680,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base_lora16__split_fm_lco__f1__s0__emo9__base"
  },
@@ -2340,7 +2702,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base_lora16__split_fm_lco__f1__s1__emo9__base"
  },
@@ -2360,7 +2724,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base_lora16__split_fm_lco__f1__s2__emo9__base"
  },
@@ -2380,7 +2746,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base_lora16__split_fm_lco__f2__s0__emo9__base"
  },
@@ -2400,7 +2768,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base_lora16__split_fm_lco__f2__s1__emo9__base"
  },
@@ -2420,7 +2790,9 @@
   "probe": false,
   "n_perm": 0,
   "overrides": {},
-  "depends_on": [],
+  "depends_on": [
+   "select__reve_recipe"
+  ],
   "est_min": 35,
   "job_id": "reve_base_lora16__split_fm_lco__f2__s2__emo9__base"
  }

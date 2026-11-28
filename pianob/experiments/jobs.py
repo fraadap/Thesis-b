@@ -192,6 +192,7 @@ def run_job(job: Job, ctx: Context) -> str:
     if job.kind == "select":
         return run_select(job, ctx)
     cfg, hp_source = resolve_config(job.config, params=job.overrides.get("hpo_params"))
+    cfg, hp_source = recipe_patch(cfg, hp_source)
     if cfg.family == "const":
         return run_const(job, ctx, cfg)
     if cfg.family == "features":
@@ -207,6 +208,8 @@ def run_select(job: Job, ctx: Context) -> str:
     media della BA di VALIDATION sui seed; vince la media più alta (un collasso conta come 1/K). Scrive il
     migliore in hpo_best/<studio>.json nello stato, da cui i job successivi leggono gli iperparametri."""
     from ..report import load_jobs
+    if "candidate_jobs" in job.overrides:
+        return _select_recipe(job, ctx, load_jobs())
     cands = job.overrides["candidates"]                      # tag -> {"trial", "value", "params"}
     seeds = set(job.overrides["seeds"])
     recs = [j for j in load_jobs() if j["job_id"].split("__")[-1] in cands]
@@ -228,6 +231,44 @@ def run_select(job: Job, ctx: Context) -> str:
     kaggle_env.write_json(path, best)
     ctx.log(f"  riselezione {job.config}: " + ", ".join(f"{t} {s['mean_val']:.3f}" for t, s in scores.items())
             + f" -> {win}")
+    return "completed"
+
+
+def recipe_patch(cfg: ExpConfig, hp_source: str):
+    """Diagnosi del Gate R2: se in validation ha vinto una variante della ricetta di REVE, i suoi iperparametri
+    (GradScaler, dropout) si applicano a tutte le config REVE con la ricetta ufficiale."""
+    from .queue import RECIPE_CONFIGS, RECIPE_DEFAULT, recipe_choice
+    ch = recipe_choice()
+    if cfg.name not in RECIPE_CONFIGS or not ch or ch.get("winner", RECIPE_DEFAULT) == RECIPE_DEFAULT:
+        return cfg, hp_source
+    cfg.hparams.update(ch["patch"])
+    return cfg, f"{hp_source}+ricetta:{ch['winner']}"
+
+
+def _select_recipe(job: Job, ctx: Context, jobs: list[dict]) -> str:
+    """Scelta della ricetta di REVE (diagnosi del Gate R2) sulla sola BA di validation, media sui seed."""
+    from .queue import RECIPE_KEYS, RECIPE_STUDY
+    from .registry import get_config
+    by_id = {j["job_id"]: j for j in jobs}
+    default, margin = job.overrides["default"], float(job.overrides["margin"])
+    scores = {}
+    for c, ids in job.overrides["candidate_jobs"].items():
+        miss = [i for i in ids if i not in by_id or "val_best" not in by_id[i]]
+        if miss:
+            raise RuntimeError(f"scelta della ricetta: mancano i job {miss}")
+        v = {i.split("__")[3]: float(by_id[i]["val_best"]) for i in ids}
+        scores[c] = {"mean_val": float(np.mean(list(v.values()))), "per_seed": v}
+    others = [c for c in scores if c != default]
+    best = max(others, key=lambda c: scores[c]["mean_val"]) if others else default
+    win = best if scores[best]["mean_val"] >= scores[default]["mean_val"] + margin else default
+    base_hp, win_hp = get_config(default).hparams, get_config(win).hparams
+    patch = {k: win_hp[k] for k in RECIPE_KEYS if win_hp.get(k) != base_hp.get(k)}
+    out = {"study": RECIPE_STUDY, "winner": win, "patch": patch, "t": time.time(), "scores": scores,
+           "rule": f"BA media di validation sui seed; una variante sostituisce {default} solo se la supera di "
+                   f"almeno {margin}"}
+    kaggle_env.write_json(kaggle_env.state_dir() / "hpo_best" / f"{RECIPE_STUDY}.json", out)
+    ctx.log("  scelta della ricetta REVE: " + ", ".join(f"{c} {s['mean_val']:.4f}" for c, s in scores.items())
+            + f" -> {win} {patch}")
     return "completed"
 
 

@@ -59,7 +59,23 @@ def _compact_to_rows(cj: dict) -> list[dict]:
     return rows
 
 
+def _recipe_choice_from(paths) -> dict | None:
+    """Scelta della ricetta di REVE (diagnosi del Gate R2) negli input: serve prima di filtrare righe e job."""
+    for p in map(Path, paths):
+        if p.suffix == ".zip":
+            with zipfile.ZipFile(p) as z:
+                for n in z.namelist():
+                    if n.endswith("hpo_best/reve_recipe.json"):
+                        return json.loads(z.read(n))
+        elif p.is_dir():
+            for f in p.rglob("hpo_best/reve_recipe.json"):
+                return json.loads(f.read_text())
+    return None
+
+
 def load_inputs(paths) -> tuple[pd.DataFrame, list[dict], list[dict]]:
+    from pianob.experiments.queue import set_recipe_choice
+    set_recipe_choice(_recipe_choice_from(paths))
     rows, jobs, compact, pred_rows = [], [], [], []
     for p in map(Path, paths):
         if p.suffix == ".zip":

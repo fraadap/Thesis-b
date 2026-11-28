@@ -231,3 +231,48 @@ def test_reve_micro_batch_same_gradient_as_full_batch():
         train_reve_official(m, {**hp, "micro_batch": micro}, tr, va, 3, "cpu", seed=1, log=lambda *a: None)
         outs.append(torch.cat([p.detach().flatten() for p in m.parameters()]))
     assert torch.allclose(outs[0], outs[1], atol=1e-5), (outs[0] - outs[1]).abs().max()
+
+
+def test_reve_recipe_selection_and_invalidation(tmp_path, monkeypatch):
+    """Diagnosi del Gate R2: scelta della ricetta solo in validation, con margine; se vince una variante i job
+    REVE precedenti valgono come invalidati (righe e record) e i nuovi ricevono la patch."""
+    import pandas as pd
+    monkeypatch.setenv("PIANOB_WORKING", str(tmp_path))
+    from pianob import kaggle_env
+    from pianob.experiments import queue as Q
+    from pianob.experiments.jobs import Context, _select_recipe, recipe_patch
+    from pianob.experiments.registry import get_config
+    G = Q.QUEUES["G"]()
+    sel = next(j for j in G if j.kind == "select")
+    pos = [j.job_id for j in G].index(sel.job_id)
+    assert all(j.config in Q.RECIPE_VARIANTS for j in G[pos - 6:pos])
+    assert all(sel.job_id in j.depends_on for j in G[pos + 1:] if j.config in Q.RECIPE_CONFIGS)
+    assert all(not j.depends_on for j in G[:pos] if j.kind == "train")
+    ctx = Context(None, device="cpu", log=lambda m: None)
+
+    def jobs(vals):
+        return [{"job_id": i, "val_best": v} for c, vs in vals.items()
+                for i, v in zip(sel.overrides["candidate_jobs"][c], vs)]
+    # variante migliore di meno del margine: resta la ricetta di base, nessuna invalidazione
+    _select_recipe(sel, ctx, jobs({"reve_base": [0.45] * 3, "reve_base_yamldropout": [0.44] * 3,
+                                   "reve_base_gradscaler": [0.455] * 3}))
+    assert Q.recipe_choice()["winner"] == "reve_base" and not Q.is_invalid_record("reve_base__x", 0)
+    cfg, _ = recipe_patch(get_config("reve_base"), "registry")
+    assert cfg.hparams["grad_scaler"] is False
+    # vince il GradScaler: patch applicata, record e righe REVE precedenti invalidati (non le varianti)
+    _select_recipe(sel, ctx, jobs({"reve_base": [0.45] * 3, "reve_base_yamldropout": [0.44] * 3,
+                                   "reve_base_gradscaler": [0.47] * 3}))
+    ch = Q.recipe_choice()
+    assert ch["winner"] == "reve_base_gradscaler" and ch["patch"] == {"grad_scaler": True}
+    cfg, src = recipe_patch(get_config("reve_base_scratch"), "registry")
+    assert cfg.hparams["grad_scaler"] is True and "gradscaler" in src
+    assert get_config("reve_base_lp").hparams["grad_scaler"] is False
+    t = ch["t"]
+    assert Q.is_invalid_record("reve_base__split_fm__f0__s42__emo9__base", t - 1)
+    assert not Q.is_invalid_record("reve_base__split_fm__f0__s42__emo9__base", t + 1)
+    assert not Q.is_invalid_record("reve_base_gradscaler__split_fm__f0__s42__emo9__base", t - 1)
+    df = pd.DataFrame({"config": ["reve_base", "reve_base", "reve_base_gradscaler", "reve_base_lp"],
+                       "protocol": "split_fm", "fold": 0, "seed": 42, "task": "emo9", "variant": "base",
+                       "t": [t - 1, t + 1, t - 1, t - 1]})
+    assert Q.invalid_row_mask(df).tolist() == [True, False, False, False]
+    assert (kaggle_env.state_dir() / "hpo_best" / "reve_recipe.json").exists()

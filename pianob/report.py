@@ -174,6 +174,11 @@ def gate_r(jobs: list[dict]) -> dict:
     if len(g10) > len(g):
         out["R3"] = {"n_seeds": len(g10), "mean": round(float(np.mean(list(g10.values()))), 4)}
     out["status"] = ("PASSATO" if GATE_R_RANGE[0] <= m <= GATE_R_RANGE[1] else "NON PASSATO") if len(g) >= 5 else "parziale"
+    from .experiments.queue import recipe_choice
+    ch = recipe_choice()
+    if ch:                                   # diagnosi del Gate R2: ricetta scelta in validation
+        out["ricetta"] = {"winner": ch["winner"], "patch": ch.get("patch"),
+                          "val": {c: round(s["mean_val"], 4) for c, s in ch.get("scores", {}).items()}}
     return out
 
 
