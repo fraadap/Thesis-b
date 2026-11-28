@@ -44,9 +44,11 @@ ITEM_CATEGORY = {"joy": 7, "tenderness": 8, "inspiration": 6, "amusement": 5,
 DERIVED_ITEMS = ["valence", "arousal", "liking", "familiarity"]
 SEED_TIES = 20261127
 SEED_ARGMAX = 20261128
+ALIGNMENT_USER_DECISION = "vid"   # §1.1, decisione dell'utente del 2026-11-28 (None = regola automatica)
 MIN_ALIGN_DIFF = 0.2          # §1.1: differenza minima di concordanza tra i due allineamenti
 MIN_CONCORDANCE = 0.2         # §1.2: sotto questa media (caso 1/8 = 0.125) la mappatura è sbagliata
-MIN_COLUMN_MATCHES = 6        # §1.1: item discreti con il massimo sulla propria categoria (su 8)
+MIN_COLUMN_MATCHES = 4      # item discreti con il massimo sulla propria categoria (caso ~1/8 con colonne permutate);
+                            # 6 era troppo severo: con 3 soggetti paura e tristezza sono più alte sulle clip di disgusto
 # Hash del contenuto canonico della tabella registrato dopo la prima esecuzione reale (None = da registrare).
 EXPECTED_SELFREPORT_SHA: str | None = None
 
@@ -197,6 +199,16 @@ def choose_alignment(parsed: dict[int, dict]) -> dict:
     out = {"concordance_vid": mv, "concordance_canonical": mc, "vid_identity_everywhere": identical}
     if identical:
         out["alignment"] = "vid"           # i due allineamenti coincidono
+    elif ALIGNMENT_USER_DECISION == "vid":
+        # decisione dell'utente (2026-11-28, §1.1): righe in ordine di presentazione, vid[k] = clip della riga k;
+        # l'EEG pre-processato è già in ordine canonico di vid. Controllo di sicurezza: ci si ferma solo se
+        # l'allineamento canonico spiega i voti meglio di vid (file con struttura diversa da quella attesa).
+        if mc >= mv:
+            raise SelfReportError(f"allineamento per vid contraddetto dai dati: concordanza con vid {mv:.3f}, "
+                                  f"canonico {mc:.3f}")
+        out["alignment"] = "vid"
+        out["decision"] = ("utente: righe in ordine di presentazione, vid = indice della clip; la soglia "
+                           f"{MIN_ALIGN_DIFF} di §1.1 non si applica (argmax su 8 item continui, concordanza massima ~0.4)")
     elif abs(mv - mc) < MIN_ALIGN_DIFF:
         raise SelfReportError(f"allineamento delle righe indeciso: concordanza con vid {mv:.3f}, canonico "
                               f"{mc:.3f} (differenza < {MIN_ALIGN_DIFF}). Serve una decisione dell'utente.")

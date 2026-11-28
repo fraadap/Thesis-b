@@ -49,11 +49,15 @@ def test_struct_array_format_is_parsed():
     assert out["score"].shape == (28, 12) and out["vid"][0] == 28
 
 
-def test_indistinguishable_alignment_stops():
+def test_indistinguishable_alignment_stops(monkeypatch):
     rng = np.random.default_rng(0)
     parsed = {s: {"score": rng.integers(0, 8, (28, 12)).astype(float), "trial": np.arange(1, 29),
                   "vid": rng.permutation(28) + 1, "extra": {}, "fields": {}} for s in range(20)}
+    monkeypatch.setattr(T, "ALIGNMENT_USER_DECISION", None)      # regola automatica: si ferma
     with pytest.raises(T.SelfReportError, match="indeciso"):
+        T.build_table(parsed, log=lambda *a: None)
+    monkeypatch.setattr(T, "ALIGNMENT_USER_DECISION", "vid")     # decisione dell'utente: voti casuali bloccati
+    with pytest.raises(T.SelfReportError):                       # (vid contraddetto o concordanza al caso)
         T.build_table(parsed, log=lambda *a: None)
 
 
