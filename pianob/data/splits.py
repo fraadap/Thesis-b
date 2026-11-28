@@ -4,6 +4,9 @@
 - split_fm_lco  : stessi soggetti x 3 fold di clip; test su clip viste (baseline appaiata) e non viste
 - lnso10        : 10 fold sequenziali sui soggetti (12 per fold, 15 nell'ultimo), val = 10% del train
 - lnso10_lco    : lnso10 x 3 fold di clip (fold = 3 * fold_soggetti + fold_clip)
+- split_fm_within: come la letteratura "entro soggetto": soggetti di training e di test di split_fm, ma i
+    soggetti di test contribuiscono al training con 2 dei 3 segmenti da 10 s di ogni clip; il test è sul
+    segmento rimasto (fold k = segmento k). Finestre della stessa clip e dello stesso soggetto in training e test.
 - split_fm_sizematched / lnso10_sizematched : controllo della quantità di dati per il leave-clip-out.
     Stessi soggetti e stesso numero di finestre di training del fold LCO k, ma ogni soggetto di training
     contribuisce un sottoinsieme casuale di clip (diverso per soggetto) con la stessa composizione per
@@ -18,7 +21,9 @@ import numpy as np
 
 from . import faced_meta as FM
 
-PROTOCOLS = ("split_fm", "split_fm_lco", "lnso10", "lnso10_lco", "split_fm_sizematched", "lnso10_sizematched")
+PROTOCOLS = ("split_fm", "split_fm_lco", "lnso10", "lnso10_lco", "split_fm_sizematched", "lnso10_sizematched",
+             "split_fm_within")
+WITHIN_SEGMENT_S = 10.0           # split_fm_within: segmenti da 10 s (3 per clip)
 SIZEMATCHED = ("split_fm_sizematched", "lnso10_sizematched")
 N_CLIP_FOLDS = 3
 N_SUBJ_FOLDS = 10
@@ -39,6 +44,7 @@ class Split:
     heldout_clips: list[int] = field(default_factory=list)
     draw: int | None = None
     all_clips: list[int] = field(default_factory=list)   # clip del task (per l'allineamento dei soggetti di test)
+    within_segment: int | None = None   # solo split_fm_within: segmento da 10 s di test dei soggetti di test
 
     @property
     def is_sizematched(self) -> bool:
@@ -72,7 +78,7 @@ class Split:
 
 def n_folds(protocol: str) -> int:
     return {"split_fm": 1, "split_fm_lco": N_CLIP_FOLDS, "lnso10": N_SUBJ_FOLDS,
-            "lnso10_lco": N_SUBJ_FOLDS * N_CLIP_FOLDS, "split_fm_sizematched": N_CLIP_FOLDS,
+            "lnso10_lco": N_SUBJ_FOLDS * N_CLIP_FOLDS, "split_fm_sizematched": N_CLIP_FOLDS, "split_fm_within": 3,
             "lnso10_sizematched": N_SUBJ_FOLDS * N_CLIP_FOLDS}[protocol]
 
 
@@ -135,7 +141,7 @@ def make_split(protocol: str, fold: int = 0, task_clips: list[int] | None = None
         k = max_subjects
         sp = Split(sp.protocol, sp.fold, sp.train_subjects[:k], sp.val_subjects[:max(1, k // 2)],
                    sp.test_subjects[:max(1, k // 2)], sp.train_clips, sp.unseen_clips,
-                   all_clips=sp.all_clips)
+                   all_clips=sp.all_clips, within_segment=sp.within_segment)
     return sp
 
 
@@ -189,7 +195,7 @@ def _make_split(protocol: str, fold: int = 0, task_clips: list[int] | None = Non
     present = set(all_ids if subjects_present is None else subjects_present)
     assert 0 <= fold < n_folds(protocol), f"fold {fold} fuori range per {protocol}"
 
-    if protocol in ("split_fm", "split_fm_lco"):
+    if protocol in ("split_fm", "split_fm_lco", "split_fm_within"):
         assert n_subjects == FM.N_SUBJECTS, "split_fm è definito solo per i 123 soggetti di FACED"
         tr, va, te = all_ids[:80], all_ids[80:100], all_ids[100:]
         clip_fold = fold if protocol == "split_fm_lco" else None
@@ -211,7 +217,8 @@ def _make_split(protocol: str, fold: int = 0, task_clips: list[int] | None = Non
         cf = clip_fold_assignment(clip_labels)
         unseen = [c for c in task_clips if cf[c] == clip_fold]
         train_clips = [c for c in task_clips if cf[c] != clip_fold]
-    sp = Split(protocol, fold, tr, va, te, train_clips, unseen, shared_stimuli=True, all_clips=list(task_clips))
+    sp = Split(protocol, fold, tr, va, te, train_clips, unseen, shared_stimuli=True, all_clips=list(task_clips),
+               within_segment=fold if protocol == "split_fm_within" else None)
     check_split(sp, clip_labels)
     return sp
 

@@ -276,3 +276,38 @@ def test_reve_recipe_selection_and_invalidation(tmp_path, monkeypatch):
                        "t": [t - 1, t + 1, t - 1, t - 1]})
     assert Q.invalid_row_mask(df).tolist() == [True, False, False, False]
     assert (kaggle_env.state_dir() / "hpo_best" / "reve_recipe.json").exists()
+
+
+def test_clip_identity_and_within_subject_jobs(tmp_path, monkeypatch):
+    """Notebook K: task clip28 (28 classi) e protocollo entro soggetto (segmento k al test, gli altri due in
+    training per gli stessi soggetti), su feature e su rete neurale, con il controllo anti-leakage."""
+    import json
+    import numpy as np
+    monkeypatch.setenv("PIANOB_WORKING", str(tmp_path))
+    from pianob.data.adapters import FacedAdapter
+    from pianob.data.splits import make_split
+    from pianob.data.windows import make_windows
+    from pianob.experiments.jobs import Context, run_job, within_masks
+    from pianob.experiments.queue import QUEUES, Job
+    sp = make_split("split_fm_within", 1)
+    assert sp.within_segment == 1 and not set(sp.train_subjects) & set(sp.test_subjects)
+    ws = make_windows(np.repeat([0, 100], 2), np.tile([0, 1], 2), np.zeros(4, int), 6000, 800, overlap=0.5)
+    tr, te = within_masks(sp, ws, 200, True), within_masks(sp, ws, 200, False)
+    t = ws.subject == 100
+    assert tr[~t].all() and not (tr & te)[t].any() and te[t].any()
+    seg = (ws.win_start[t & tr] + 800 <= 2000) | (ws.win_start[t & tr] >= 4000)
+    assert seg.all() and ((ws.win_start[te & t] >= 2000) & (ws.win_start[te & t] + 800 <= 4000)).all()
+    ctx = Context(FacedAdapter(synthetic=True).load(), device="cpu", log=lambda m: None)
+    for job in (Job("train", "de_asym_lr_zsub", "split_fm", 0, 0, "clip28", overrides={"max_subjects": 4}),
+                Job("train", "de_asym_lr_zsub", "split_fm_within", 2, 0, overrides={"max_subjects": 4}),
+                Job("train", "eegnet_lawhern_ea", "split_fm_within", 0, 0,
+                    overrides={"max_subjects": 4, "hparams": {"epochs": 1}})):
+        assert run_job(job, ctx) == "completed", job.job_id
+    rows = [json.loads(l) for f in (tmp_path / "pianob_state" / "results").glob("rows_*.jsonl")
+            for l in f.read_text().splitlines()]
+    assert {(r["protocol"], r["task"]) for r in rows} >= {("split_fm", "clip28"), ("split_fm_within", "emo9")}
+    jobs = [json.loads(l) for f in (tmp_path / "pianob_state" / "results").glob("jobs_*.jsonl")
+            for l in f.read_text().splitlines()]
+    cm = next(j for j in jobs if "clip28" in j["job_id"])["confusion_all"]
+    assert len(cm) == 28
+    assert len(QUEUES["K"]()) == 40

@@ -630,9 +630,31 @@ def queue_I() -> list[Job]:
     return J
 
 
+def queue_K() -> list[Job]:
+    """Notebook K (confronti aggiuntivi, in ordine di priorità):
+    1. riconoscimento della clip (quale delle 28, tra soggetti, split_fm): quanto ogni modello riconosce lo
+       stimolo, da mettere accanto all'accuratezza emotiva sulle clip viste (figura F10);
+    2. protocollo entro soggetto (split_fm_within, 3 segmenti da 10 s): la scala dei protocolli (figura F9);
+    3. lunghezza della finestra (2 e 4 s contro 10 s) nel leave-clip-out (figura F13), priorità bassa."""
+    J = []
+    J += [Job("train", "de_asym_lr_zsub", "split_fm", 0, 0, "clip28")]
+    for c, seeds in (("eegnet_lawhern_ea", SEEDS3), ("tsception_ding_ea", SEEDS3), ("tsception_ea", SEEDS3),
+                     ("cbramod_ft_official", CBRAMOD_SEEDS3)):
+        J += train_jobs(c, ["split_fm"], seeds, task="clip28")
+    J += train_jobs("de_asym_lr_zsub", ["split_fm_within"], [0])
+    J += train_jobs("eegnet_lawhern_ea", ["split_fm_within"], [0])
+    J += train_jobs("tsception_ding_ea", ["split_fm_within"], [0])
+    J += train_jobs("cbramod_ft_official", ["split_fm_within"], [3407])
+    for c in ("de_asym_lr_zsub_w4", "de_asym_lr_zsub_w2", "tsception_ding_ea_w4", "tsception_ding_ea_w2"):
+        J += train_jobs(c, ["split_fm_lco"], [0])
+    J += train_jobs("cbramod_ft_official_w4", ["split_fm_lco"], [3407])
+    return J
+
+
 QUEUES = {"nb0_smoke": queue_nb0, "nbA_baselines_tsception": queue_nbA, "nbB_cbramod_gate": queue_nbB,
           "nbC_cbramod_main": queue_nbC, "nbD_lnso10": queue_nbD, "nbE_eegnet": queue_nbE,
-          "F": queue_F, "F_bis": queue_F_bis, "G": queue_G, "H": queue_H, "I": queue_I}
+          "F": queue_F, "F_bis": queue_F_bis, "G": queue_G, "H": queue_H, "I": queue_I,
+          "K": queue_K}
 
 
 def main():

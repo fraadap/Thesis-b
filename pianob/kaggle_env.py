@@ -128,7 +128,12 @@ def read_jsonl(path) -> list[dict]:
 
 def restore_state_from_inputs(verbose: bool = True) -> dict:
     """Copia nello stato corrente risultati, done, checkpoint, .db Optuna ecc. trovati negli
-    output di sessioni precedenti collegati come input. Non sovrascrive file più recenti."""
+    output di sessioni precedenti collegati come input. Non sovrascrive file più recenti.
+    PIANOB_NO_RESTORE=1 (notebook delle figure): gli input si leggono in sola lettura, nessuna copia."""
+    if os.environ.get("PIANOB_NO_RESTORE") == "1":
+        if verbose:
+            print("[ripresa] disattivata: gli output collegati restano in sola lettura")
+        return {}
     dst = state_dir()
     copied = {}
     account = os.environ.get("PIANOB_ACCOUNT")

@@ -116,6 +116,8 @@ Pagina del Dataset `pianob-code` → *New Version* → carica il nuovo `pianob_c
 | `nbG_reve.ipynb` | Sessione 02, account dedicato | REVE-Base: Gate R poi tutti i protocolli di CBraMod. Coda `G` (2-3 sessioni). **Internet ON** e Secret `HF_TOKEN` (sezione C2) |
 | `nbH_selfreport_feature.ipynb` | Sessione 03 | Label da self-report: tabella dei voti, descrittive (`report_selfreport_stage1.md`), rianalisi delle predizioni salvate, DE + z-score (worker solo-CPU) e TSception. Coda `H` (2-3 sessioni). Input: anche **gli output di tutte le sessioni precedenti** (sezione C3) |
 | `nbI_selfreport_cbramod.ipynb` | Sessione 03, in parallelo a H | Label da self-report con CBraMod (ricetta ufficiale); REVE solo se il Gate R è passato (output del notebook G in input, Internet ON e `HF_TOKEN`). Coda `I` (2+ sessioni) |
+| `nbJ_figures.ipynb` | Figure della tesi | Solo CPU, nessun training. Genera tutte le figure (inglese, PDF e PNG) e `INDEX.md` da **l'ultimo output di ogni notebook** (A-G, poi H, I, K) collegato come input; con `PIANOB_NO_RESTORE` gli input restano in sola lettura. Output `figures_thesis.zip` |
+| `nbK_confronti.ipynb` | Confronti aggiuntivi | Coda `K` (40 job, GPU + 2 worker CPU): riconoscimento della clip (28 classi), protocollo entro soggetto (`split_fm_within`), finestre da 2 e 4 s nel leave-clip-out. Input: dati, codice, pesi di CBraMod |
 
 La coda `F_bis` (ablazione della testa) è solo preparata: non c'è un notebook. Si lancia solo se l'aggregatore
 scrive "LANCIARE la coda F_bis" (regola A.4); in quel caso basta cambiare `"F"` in `"F_bis"` nel notebook F.

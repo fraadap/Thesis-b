@@ -98,6 +98,17 @@ def _all() -> dict[str, ExpConfig]:
           hparams=dict(_TSC_DING), notes="come tsception_ding + allineamento EA per soggetto"),
         C("cbramod_ft_official", "neural", "cbramod", window_s=10, pretrained=True, recipe="cbramod_official",
           hparams=dict(_CBRAMOD_OFFICIAL), notes="Gate 1: ricetta ufficiale, full fine-tuning"),
+        # --- Lunghezza della finestra sulle clip nuove (notebook K, priorità bassa): una sola modifica (window_s)
+        C("de_asym_lr_zsub_w4", "features", "lr", window_s=4, features="de_asym", feature_zsub=True,
+          hparams={"clf": ["lr", "svm"]}, notes="come de_asym_lr_zsub, finestre da 4 s"),
+        C("de_asym_lr_zsub_w2", "features", "lr", window_s=2, features="de_asym", feature_zsub=True,
+          hparams={"clf": ["lr", "svm"]}, notes="come de_asym_lr_zsub, finestre da 2 s"),
+        C("tsception_ding_ea_w4", "neural", "tsception", window_s=4, align="ea", channel_layout="hemispheric",
+          hparams=dict(_TSC_DING), notes="come tsception_ding_ea, finestre da 4 s"),
+        C("tsception_ding_ea_w2", "neural", "tsception", window_s=2, align="ea", channel_layout="hemispheric",
+          hparams=dict(_TSC_DING), notes="come tsception_ding_ea, finestre da 2 s"),
+        C("cbramod_ft_official_w4", "neural", "cbramod", window_s=4, pretrained=True, recipe="cbramod_official",
+          hparams=dict(_CBRAMOD_OFFICIAL), notes="come cbramod_ft_official, finestre da 4 s (4 patch per canale)"),
         C("cbramod_scratch_ft", "neural", "cbramod", window_s=10, pretrained=False, recipe="cbramod_official",
           hparams=dict(_CBRAMOD_OFFICIAL), notes="init casuale, stessa ricetta (cfr. issue #22 del repo)"),
         # Diagnostica dell'init casuale (la ricetta esatta collassa sulla classe più frequente, cfr. issue #22):

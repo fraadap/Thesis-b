@@ -102,7 +102,23 @@ def load_aligned_per_subject(ctx: Context, jd: JobData, plan, band, win_len: int
 
 
 def _train_plan(sp: Split):
-    return [(s, sp.subject_train_clips(s), sp.subject_train_clips(s)) for s in sp.train_subjects]
+    plan = [(s, sp.subject_train_clips(s), sp.subject_train_clips(s)) for s in sp.train_subjects]
+    if sp.within_segment is not None:   # entro soggetto: anche i soggetti di test (allineati come al test)
+        plan += [(s, list(sp.all_clips), list(sp.all_clips)) for s in sp.test_subjects]
+    return plan
+
+
+def within_masks(sp: Split, ws, fs: float, train: bool) -> np.ndarray:
+    """split_fm_within. Training: finestre dei soggetti di test interamente FUORI dal segmento di test (le
+    altre finestre restano). Test: finestre interamente DENTRO il segmento di test."""
+    from ..data.splits import WITHIN_SEGMENT_S
+    L = int(round(WITHIN_SEGMENT_S * fs))
+    a, b = sp.within_segment * L, (sp.within_segment + 1) * L
+    st, en = ws.win_start, ws.win_start + ws.win_len
+    inside = (st >= a) & (en <= b)
+    outside = (en <= a) | (st >= b)
+    is_test_subj = np.isin(ws.subject, sp.test_subjects)
+    return ~is_test_subj | outside if train else inside
 
 
 def _plan_meta(plan, clip_labels):
@@ -326,8 +342,9 @@ def _feature_cache(ctx: Context, cfg: ExpConfig, jd: JobData, band, subjects) ->
     return out
 
 
-def _xy(feats, subjects, clips, clip_labels, zsub_clips=None):
-    """`clips` / `zsub_clips`: lista comune oppure funzione soggetto -> lista (protocolli *_sizematched)."""
+def _xy(feats, subjects, clips, clip_labels, zsub_clips=None, windows=None):
+    """`clips` / `zsub_clips`: lista comune oppure funzione soggetto -> lista (protocolli *_sizematched).
+    `windows`: indici delle finestre del trial da tenere (split_fm_within), None = tutte."""
     X, S, Cc = [], [], []
     for s in subjects:
         F = feats[s]
@@ -336,7 +353,7 @@ def _xy(feats, subjects, clips, clip_labels, zsub_clips=None):
         if zc is not None:  # z-score per soggetto sulle clip disponibili (label-free)
             ref = F[zc].reshape(-1, F.shape[-1])
             F = (F - ref.mean(0)) / (ref.std(0) + 1e-8)
-        Fx = F[cl]
+        Fx = F[cl] if windows is None else F[cl][:, list(windows)]
         X.append(Fx.reshape(-1, F.shape[-1]))
         S.append(np.full(Fx.shape[0] * Fx.shape[1], s))
         Cc.append(np.repeat(cl, Fx.shape[1]))
@@ -390,10 +407,20 @@ def run_features(job: Job, ctx: Context, cfg: ExpConfig) -> str:
     feats = _feature_cache(ctx, cfg, jd, job.band, subs)
     z = cfg.feature_zsub
 
+    win = None
+    if sp.within_segment is not None:      # finestre da 10 s = segmenti: k al test, le altre in training
+        n_win = next(iter(feats.values())).shape[1]
+        assert n_win == 3, f"split_fm_within richiede finestre da 10 s (3 per trial), trovate {n_win}"
+        win = ([w for w in range(n_win) if w != sp.within_segment], [sp.within_segment])
+
     def data(lab):
         tr = _xy(feats, sp.train_subjects, sp.subject_train_clips, lab, sp.subject_train_clips if z else None)
+        if win is not None:
+            tw = _xy(feats, sp.test_subjects, all_eval, lab, all_eval if z else None, windows=win[0])
+            tr = tuple(np.concatenate([a, b]) for a, b in zip(tr, tw))
         va = _xy(feats, sp.val_subjects, sp.train_clips, lab, sp.train_clips if z else None)
-        te = {cond: _xy(feats, sp.test_subjects, cl, lab, all_eval if z else None) for cond, cl in conds.items()}
+        te = {cond: _xy(feats, sp.test_subjects, cl, lab, all_eval if z else None,
+                        windows=None if win is None else win[1]) for cond, cl in conds.items()}
         if cfg.feature_clipres:      # ogni insieme toglie la media della clip calcolata sui propri soggetti
             tr, va = _clipres(tr), _clipres(va)
             te = {cond: _clipres(v) for cond, v in te.items()}
@@ -401,7 +428,7 @@ def run_features(job: Job, ctx: Context, cfg: ExpConfig) -> str:
 
     tr, va, te = data(jd.clip_labels)
     allowed = sorted(set().union(*[sp.subject_train_clips(s) for s in sp.train_subjects]))
-    check_windows_in_split(tr[1], tr[2], sp.train_subjects, allowed, "train")
+    check_windows_in_split(tr[1], tr[2], sp.train_subjects + (sp.test_subjects if win else []), allowed, "train")
     if sp.is_sizematched:
         _check_train_size(sp, len(tr[1]) // max(1, sp.n_train_trials()), len(tr[1]), job)
     best = (-1, None, None)
@@ -566,6 +593,9 @@ def build_banks(job: Job, ctx: Context, jd: JobData, win_len: int, need_train=Tr
         banks["train"] = TrialBank(arrs["train"], s, c, l, win_len, jd.cfg.overlap_train, dev)
         if is_sr(job.task):
             banks["train"].keep(banks["train"].ws.label >= 0)
+        if sp.within_segment is not None:
+            banks["train"].keep(within_masks(sp, banks["train"].ws, ctx.adapter.fs, train=True))
+            _check_within(sp, banks["train"].ws, ctx.adapter.fs)
         ws = banks["train"].ws
         for sub in sp.train_subjects:   # nessuna finestra fuori dalle clip di training del suo soggetto
             m = ws.subject == sub
@@ -583,8 +613,21 @@ def build_banks(job: Job, ctx: Context, jd: JobData, win_len: int, need_train=Tr
         banks["test"] = TrialBank(arrs["test"], s, c, l, win_len, 0.0, dev)
         if is_sr(job.task):
             banks["test"].keep(banks["test"].ws.label >= 0)
+        if sp.within_segment is not None:
+            banks["test"].keep(within_masks(sp, banks["test"].ws, ctx.adapter.fs, train=False))
+            assert banks["test"].n > 0, "split_fm_within: nessuna finestra di test dentro il segmento"
         check_windows_in_split(banks["test"].ws.subject, banks["test"].ws.clip, sp.test_subjects, all_eval, "test")
     return banks
+
+
+def _check_within(sp: Split, ws, fs: float) -> None:
+    """Nessuna finestra di training dei soggetti di test tocca il loro segmento di test."""
+    from ..data.splits import WITHIN_SEGMENT_S
+    L = int(round(WITHIN_SEGMENT_S * fs))
+    a, b = sp.within_segment * L, (sp.within_segment + 1) * L
+    m = np.isin(ws.subject, sp.test_subjects)
+    overlap = (ws.win_start[m] < b) & (ws.win_start[m] + ws.win_len > a)
+    assert not overlap.any(), "LEAKAGE split_fm_within: finestre di training nel segmento di test"
 
 
 def make_model(ctx: Context, cfg: ExpConfig, n_ch: int, win_len: int, n_classes: int, channel_names=None):

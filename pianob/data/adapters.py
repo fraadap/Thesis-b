@@ -95,6 +95,8 @@ def _task_labels(task: str, clip_labels, clip_valence) -> np.ndarray:
     if task == "val2":  # positiva (1) contro negativa (0), neutre escluse (-1), come FACED-2
         v = np.asarray(clip_valence)
         return np.where(v > 0, 1, np.where(v < 0, 0, -1))
+    if task == "clip28":  # quale delle 28 clip (identità dello stimolo), tra soggetti diversi
+        return np.arange(len(clip_labels))
     if task.startswith("sr_"):  # Sessione 03: label per (soggetto, clip) dai voti; qui solo "tutte le clip"
         return np.zeros(len(clip_labels), dtype=int)
     raise ValueError(f"task sconosciuto: {task}")
